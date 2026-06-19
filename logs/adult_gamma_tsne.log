@@ -1,0 +1,713 @@
+
+============================================================
+  dataset    : adult
+  out_dir    : /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne
+  perplexity : 30
+  gamma_s/h  : 0.7 / 1.5
+  n_runs     : 5
+  plot_only  : False
+============================================================
+
+Loading Adult census data ...
+  n=48842  d=105
+Building base affinities (ρ=30) ...
+
+--- Exp 1: Affinity row sharpness ---
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp1_affinity_sharpness/01a_affinity_standard.png
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp1_affinity_sharpness/01b_affinity_smooth.png
+  Exp 1 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp1_affinity_sharpness
+
+--- Exp 2a: Effective perplexity distribution ---
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp2_eff_perplexity/02a_eff_perp.png
+  Exp 2a done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp2_eff_perplexity
+
+--- Exp 3: Δρ correlations ---
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp3_delta_perp/03a_delta_rho_vs_top5.png
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp3_delta_perp/03b_delta_rho_vs_sigma.png
+  Exp 3 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp3_delta_perp
+Computing sensitivity grid ...
+
+  Running sensitivity grid ...
+    Pre-computing HD KNN ...
+    ρ=30: building affinities ...
+      aff γ=0.00 ... med_eff_perp=90.0
+      aff γ=0.50 ... med_eff_perp=69.8
+      aff γ=0.70 ... med_eff_perp=52.7
+      aff γ=1.00 ... med_eff_perp=30.0
+      aff γ=1.20 ... med_eff_perp=20.3
+      aff γ=1.50 ... med_eff_perp=12.2
+      aff γ=2.00 ... med_eff_perp=6.8
+      ρ=30, seed=191664964
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=30 seed=191664964 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=30, seed=1662057958
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=30 seed=1662057958 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=30, seed=1405681632
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=30 seed=1405681632 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=30, seed=942484272
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=30 seed=942484272 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=30, seed=929893138
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=30 seed=929893138 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+    ρ=50: building affinities ...
+      aff γ=0.00 ... med_eff_perp=150.0
+      aff γ=0.50 ... med_eff_perp=118.6
+      aff γ=0.70 ... med_eff_perp=90.0
+      aff γ=1.00 ... med_eff_perp=50.0
+      aff γ=1.20 ... med_eff_perp=32.3
+      aff γ=1.50 ... med_eff_perp=17.9
+      aff γ=2.00 ... med_eff_perp=8.9
+      ρ=50, seed=191664964
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=50 seed=191664964 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=50, seed=1662057958
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=50 seed=1662057958 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=50, seed=1405681632
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=50 seed=1405681632 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=50, seed=942484272
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=50 seed=942484272 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=50, seed=929893138
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=50 seed=929893138 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+    ρ=100: building affinities ...
+      aff γ=0.00 ... med_eff_perp=300.0
+      aff γ=0.50 ... med_eff_perp=240.2
+      aff γ=0.70 ... med_eff_perp=183.7
+      aff γ=1.00 ... med_eff_perp=100.0
+      aff γ=1.20 ... med_eff_perp=61.8
+      aff γ=1.50 ... med_eff_perp=30.9
+      aff γ=2.00 ... med_eff_perp=13.2
+      ρ=100, seed=191664964
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=100 seed=191664964 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=100, seed=1662057958
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=100 seed=1662057958 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=100, seed=1405681632
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=100 seed=1405681632 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=100, seed=942484272
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=100 seed=942484272 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=100, seed=929893138
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=100 seed=929893138 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+    ρ=200: building affinities ...
+      aff γ=0.00 ... med_eff_perp=600.0
+      aff γ=0.50 ... med_eff_perp=483.4
+      aff γ=0.70 ... med_eff_perp=371.2
+      aff γ=1.00 ... med_eff_perp=200.0
+      aff γ=1.20 ... med_eff_perp=119.9
+      aff γ=1.50 ... med_eff_perp=55.3
+      aff γ=2.00 ... med_eff_perp=20.3
+      ρ=200, seed=191664964
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=200 seed=191664964 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=200, seed=1662057958
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=200 seed=1662057958 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=200, seed=1405681632
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=200 seed=1405681632 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=200, seed=942484272
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=200 seed=942484272 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+      ρ=200, seed=929893138
+        γ=0.00 ... done
+        γ=0.50 ... done
+        γ=0.70 ... done
+        γ=1.00 ... done
+        γ=1.20 ... done
+        γ=1.50 ... done
+        γ=2.00 ... done
+      checkpoint: ρ=200 seed=929893138 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+  Grid complete (140 rows) → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/sensitivity_grid/sensitivity_grid.csv
+
+--- Exp 4: Neighborhood Overlap gamma sweep ---
+  Pre-computing HD KNN at k=200 ...
+  seed=191664964 ...
+    γ=0.00 ... done
+    γ=0.30 ... done
+    γ=0.50 ... done
+    γ=0.70 ... done
+    γ=0.90 ... done
+    γ=1.00 ... done
+    γ=1.20 ... done
+    γ=1.50 ... done
+    γ=2.00 ... done
+  checkpoint: seed=191664964 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp4_neighborhood_overlap_gamma_sweep/neighborhood_overlap_gamma_sweep.csv
+  seed=1662057958 ...
+    γ=0.00 ... done
+    γ=0.30 ... done
+    γ=0.50 ... done
+    γ=0.70 ... done
+    γ=0.90 ... done
+    γ=1.00 ... done
+    γ=1.20 ... done
+    γ=1.50 ... done
+    γ=2.00 ... done
+  checkpoint: seed=1662057958 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp4_neighborhood_overlap_gamma_sweep/neighborhood_overlap_gamma_sweep.csv
+  seed=1405681632 ...
+    γ=0.00 ... done
+    γ=0.30 ... done
+    γ=0.50 ... done
+    γ=0.70 ... done
+    γ=0.90 ... done
+    γ=1.00 ... done
+    γ=1.20 ... done
+    γ=1.50 ... done
+    γ=2.00 ... done
+  checkpoint: seed=1405681632 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp4_neighborhood_overlap_gamma_sweep/neighborhood_overlap_gamma_sweep.csv
+  seed=942484272 ...
+    γ=0.00 ... done
+    γ=0.30 ... done
+    γ=0.50 ... done
+    γ=0.70 ... done
+    γ=0.90 ... done
+    γ=1.00 ... done
+    γ=1.20 ... done
+    γ=1.50 ... done
+    γ=2.00 ... done
+  checkpoint: seed=942484272 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp4_neighborhood_overlap_gamma_sweep/neighborhood_overlap_gamma_sweep.csv
+  seed=929893138 ...
+    γ=0.00 ... done
+    γ=0.30 ... done
+    γ=0.50 ... done
+    γ=0.70 ... done
+    γ=0.90 ... done
+    γ=1.00 ... done
+    γ=1.20 ... done
+    γ=1.50 ... done
+    γ=2.00 ... done
+  checkpoint: seed=929893138 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp4_neighborhood_overlap_gamma_sweep/neighborhood_overlap_gamma_sweep.csv
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp4_neighborhood_overlap_gamma_sweep/04_neighborhood_overlap_gamma_sweep.png
+  Exp 4 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp4_neighborhood_overlap_gamma_sweep
+
+--- Exp 5: Embedding comparison (adult) ---
+  Running standard t-SNE (γ=1.0, ρ=30) ...
+  Running smooth t-SNE (γ=0.5, ρ=30) ...
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp5_embedding/05_embedding_adult.png
+  Exp 5 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp5_embedding
+
+--- Exp 2b: Median effective perplexity heatmap ---
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp2_eff_perplexity/02b_median_eff_perp_heatmap.png
+  Exp 2b done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp2_eff_perplexity
+
+--- Exp 6: Neighborhood Overlap sensitivity heatmaps ---
+  Grid saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp6_sensitivity/sensitivity_grid.csv
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp6_sensitivity/06a_neighborhood_overlap_auc_1_10.png
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp6_sensitivity/06b_neighborhood_overlap_auc_11_90.png
+  Exp 6 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp6_sensitivity
+
+--- Exp 7: Neighborhood Overlap comparison ---
+  ρ_matched (smooth γ=0.7) = 53
+  Building affinities ...
+  Pre-computing HD KNN at k=200 ...
+  seed=191664964 ...
+    standard  ρ= ... done
+    smooth  γ=0. ... done
+    sharp  γ=1.5 ... done
+    matched ... done
+  checkpoint: seed=191664964 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp7_neighborhood_overlap_comparison/neighborhood_overlap_comparison.csv
+  seed=1662057958 ...
+    standard  ρ= ... done
+    smooth  γ=0. ... done
+    sharp  γ=1.5 ... done
+    matched ... done
+  checkpoint: seed=1662057958 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp7_neighborhood_overlap_comparison/neighborhood_overlap_comparison.csv
+  seed=1405681632 ...
+    standard  ρ= ... done
+    smooth  γ=0. ... done
+    sharp  γ=1.5 ... done
+    matched ... done
+  checkpoint: seed=1405681632 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp7_neighborhood_overlap_comparison/neighborhood_overlap_comparison.csv
+  seed=942484272 ...
+    standard  ρ= ... done
+    smooth  γ=0. ... done
+    sharp  γ=1.5 ... done
+    matched ... done
+  checkpoint: seed=942484272 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp7_neighborhood_overlap_comparison/neighborhood_overlap_comparison.csv
+  seed=929893138 ...
+    standard  ρ= ... done
+    smooth  γ=0. ... done
+    sharp  γ=1.5 ... done
+    matched ... done
+  checkpoint: seed=929893138 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp7_neighborhood_overlap_comparison/neighborhood_overlap_comparison.csv
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp7_neighborhood_overlap_comparison/07_neighborhood_overlap_comparison.png
+  Exp 7 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp7_neighborhood_overlap_comparison
+
+--- Exp 8: Global Spearman vs γ ---
+  ρ=30, seed=191664964 ...
+    γ=0.00 ... ρ=0.3877
+    γ=0.50 ... ρ=0.3704
+    γ=0.70 ... ρ=0.3544
+    γ=1.00 ... ρ=0.2903
+    γ=1.20 ... ρ=0.2744
+    γ=1.50 ... ρ=0.2695
+    γ=2.00 ... ρ=0.2150
+  checkpoint: ρ=30 seed=191664964 saved
+  ρ=30, seed=1662057958 ...
+    γ=0.00 ... ρ=0.3829
+    γ=0.50 ... ρ=0.3799
+    γ=0.70 ... ρ=0.3549
+    γ=1.00 ... ρ=0.2881
+    γ=1.20 ... ρ=0.2717
+    γ=1.50 ... ρ=0.2682
+    γ=2.00 ... ρ=0.2156
+  checkpoint: ρ=30 seed=1662057958 saved
+  ρ=30, seed=1405681632 ...
+    γ=0.00 ... ρ=0.3807
+    γ=0.50 ... ρ=0.3735
+    γ=0.70 ... ρ=0.3527
+    γ=1.00 ... ρ=0.2903
+    γ=1.20 ... ρ=0.2690
+    γ=1.50 ... ρ=0.2710
+    γ=2.00 ... ρ=0.2150
+  checkpoint: ρ=30 seed=1405681632 saved
+  ρ=30, seed=942484272 ...
+    γ=0.00 ... ρ=0.3883
+    γ=0.50 ... ρ=0.3782
+    γ=0.70 ... ρ=0.3516
+    γ=1.00 ... ρ=0.2911
+    γ=1.20 ... ρ=0.2815
+    γ=1.50 ... ρ=0.2701
+    γ=2.00 ... ρ=0.2172
+  checkpoint: ρ=30 seed=942484272 saved
+  ρ=30, seed=929893138 ...
+    γ=0.00 ... ρ=0.3849
+    γ=0.50 ... ρ=0.3741
+    γ=0.70 ... ρ=0.3553
+    γ=1.00 ... ρ=0.2927
+    γ=1.20 ... ρ=0.2666
+    γ=1.50 ... ρ=0.2689
+    γ=2.00 ... ρ=0.2154
+  checkpoint: ρ=30 seed=929893138 saved
+  ρ=50, seed=191664964 ...
+    γ=0.00 ... ρ=0.4237
+    γ=0.50 ... ρ=0.3916
+    γ=0.70 ... ρ=0.3851
+    γ=1.00 ... ρ=0.3465
+    γ=1.20 ... ρ=0.2910
+    γ=1.50 ... ρ=0.2704
+    γ=2.00 ... ρ=0.2116
+  checkpoint: ρ=50 seed=191664964 saved
+  ρ=50, seed=1662057958 ...
+    γ=0.00 ... ρ=0.4285
+    γ=0.50 ... ρ=0.3914
+    γ=0.70 ... ρ=0.3819
+    γ=1.00 ... ρ=0.3479
+    γ=1.20 ... ρ=0.2917
+    γ=1.50 ... ρ=0.2734
+    γ=2.00 ... ρ=0.2268
+  checkpoint: ρ=50 seed=1662057958 saved
+  ρ=50, seed=1405681632 ...
+    γ=0.00 ... ρ=0.4234
+    γ=0.50 ... ρ=0.3940
+    γ=0.70 ... ρ=0.3878
+    γ=1.00 ... ρ=0.3483
+    γ=1.20 ... ρ=0.2905
+    γ=1.50 ... ρ=0.2736
+    γ=2.00 ... ρ=0.2599
+  checkpoint: ρ=50 seed=1405681632 saved
+  ρ=50, seed=942484272 ...
+    γ=0.00 ... ρ=0.4289
+    γ=0.50 ... ρ=0.3937
+    γ=0.70 ... ρ=0.3843
+    γ=1.00 ... ρ=0.3479
+    γ=1.20 ... ρ=0.2893
+    γ=1.50 ... ρ=0.2730
+    γ=2.00 ... ρ=0.2580
+  checkpoint: ρ=50 seed=942484272 saved
+  ρ=50, seed=929893138 ...
+    γ=0.00 ... ρ=0.4357
+    γ=0.50 ... ρ=0.3872
+    γ=0.70 ... ρ=0.3795
+    γ=1.00 ... ρ=0.3455
+    γ=1.20 ... ρ=0.2925
+    γ=1.50 ... ρ=0.2728
+    γ=2.00 ... ρ=0.2118
+  checkpoint: ρ=50 seed=929893138 saved
+  ρ=100, seed=191664964 ...
+    γ=0.00 ... ρ=0.4723
+    γ=0.50 ... ρ=0.4448
+    γ=0.70 ... ρ=0.4236
+    γ=1.00 ... ρ=0.3818
+    γ=1.20 ... ρ=0.3654
+    γ=1.50 ... ρ=0.2814
+    γ=2.00 ... ρ=0.2822
+  checkpoint: ρ=100 seed=191664964 saved
+  ρ=100, seed=1662057958 ...
+    γ=0.00 ... ρ=0.4714
+    γ=0.50 ... ρ=0.4413
+    γ=0.70 ... ρ=0.4232
+    γ=1.00 ... ρ=0.3810
+    γ=1.20 ... ρ=0.3639
+    γ=1.50 ... ρ=0.2822
+    γ=2.00 ... ρ=0.2752
+  checkpoint: ρ=100 seed=1662057958 saved
+  ρ=100, seed=1405681632 ...
+    γ=0.00 ... ρ=0.4711
+    γ=0.50 ... ρ=0.4400
+    γ=0.70 ... ρ=0.4256
+    γ=1.00 ... ρ=0.3810
+    γ=1.20 ... ρ=0.3623
+    γ=1.50 ... ρ=0.2848
+    γ=2.00 ... ρ=0.2765
+  checkpoint: ρ=100 seed=1405681632 saved
+  ρ=100, seed=942484272 ...
+    γ=0.00 ... ρ=0.4794
+    γ=0.50 ... ρ=0.4392
+    γ=0.70 ... ρ=0.4246
+    γ=1.00 ... ρ=0.3823
+    γ=1.20 ... ρ=0.3655
+    γ=1.50 ... ρ=0.2824
+    γ=2.00 ... ρ=0.2769
+  checkpoint: ρ=100 seed=942484272 saved
+  ρ=100, seed=929893138 ...
+    γ=0.00 ... ρ=0.4771
+    γ=0.50 ... ρ=0.4412
+    γ=0.70 ... ρ=0.4313
+    γ=1.00 ... ρ=0.3803
+    γ=1.20 ... ρ=0.3674
+    γ=1.50 ... ρ=0.2774
+    γ=2.00 ... ρ=0.2751
+  checkpoint: ρ=100 seed=929893138 saved
+  ρ=200, seed=191664964 ...
+    γ=0.00 ... ρ=0.5001
+    γ=0.50 ... ρ=0.4877
+    γ=0.70 ... ρ=0.4712
+    γ=1.00 ... ρ=0.4269
+    γ=1.20 ... ρ=0.3853
+    γ=1.50 ... ρ=0.3484
+    γ=2.00 ... ρ=0.2689
+  checkpoint: ρ=200 seed=191664964 saved
+  ρ=200, seed=1662057958 ...
+    γ=0.00 ... ρ=0.4993
+    γ=0.50 ... ρ=0.4918
+    γ=0.70 ... ρ=0.4691
+    γ=1.00 ... ρ=0.4273
+    γ=1.20 ... ρ=0.3913
+    γ=1.50 ... ρ=0.3484
+    γ=2.00 ... ρ=0.2705
+  checkpoint: ρ=200 seed=1662057958 saved
+  ρ=200, seed=1405681632 ...
+    γ=0.00 ... ρ=0.4985
+    γ=0.50 ... ρ=0.4904
+    γ=0.70 ... ρ=0.4690
+    γ=1.00 ... ρ=0.4294
+    γ=1.20 ... ρ=0.3941
+    γ=1.50 ... ρ=0.3479
+    γ=2.00 ... ρ=0.2701
+  checkpoint: ρ=200 seed=1405681632 saved
+  ρ=200, seed=942484272 ...
+    γ=0.00 ... ρ=0.5011
+    γ=0.50 ... ρ=0.4949
+    γ=0.70 ... ρ=0.4685
+    γ=1.00 ... ρ=0.4289
+    γ=1.20 ... ρ=0.3925
+    γ=1.50 ... ρ=0.3520
+    γ=2.00 ... ρ=0.2743
+  checkpoint: ρ=200 seed=942484272 saved
+  ρ=200, seed=929893138 ...
+    γ=0.00 ... ρ=0.4979
+    γ=0.50 ... ρ=0.4940
+    γ=0.70 ... ρ=0.4690
+    γ=1.00 ... ρ=0.4270
+    γ=1.20 ... ρ=0.3916
+    γ=1.50 ... ρ=0.3493
+    γ=2.00 ... ρ=0.2696
+  checkpoint: ρ=200 seed=929893138 saved
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp8_global_spearman/08_global_spearman_vs_gamma.png
+  Exp 8 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp8_global_spearman
+
+--- Exp 9: Smooth vs standard envelope (all perplexities) ---
+
+  ρ=5: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=5 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=10: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=10 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=20: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=20 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=30: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=30 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=50: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=50 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=70: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=70 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=100: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=100 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=120: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=120 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=150: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=150 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=200: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=200 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+
+  ρ=300: pre-computing HD KNN at k=200 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=300 saved → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/smooth_vs_envelope.csv
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/09a_smooth_vs_envelope.png
+    Saved: /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope/09b_winner_perplexity.png
+  Exp 9 done → /home/smohebi/dimensionality_reduction/openTSNE/results/adult_gamma_tsne/exp9_smooth_vs_envelope
+
+--- Exp 10: NO@k and AUC vs perplexity ---
+
+  ρ=5: pre-computing HD KNN at k=30 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+  checkpoint: ρ=5 seed=191664964 saved
+    seed=1662057958 standard (γ=1.0) ...
+    seed=1662057958 smooth (γ=0.7) ...
+  checkpoint: ρ=5 seed=1662057958 saved
+    seed=1405681632 standard (γ=1.0) ...
+    seed=1405681632 smooth (γ=0.7) ...
+  checkpoint: ρ=5 seed=1405681632 saved
+    seed=942484272 standard (γ=1.0) ...
+    seed=942484272 smooth (γ=0.7) ...
+  checkpoint: ρ=5 seed=942484272 saved
+    seed=929893138 standard (γ=1.0) ...
+    seed=929893138 smooth (γ=0.7) ...
+  checkpoint: ρ=5 seed=929893138 saved
+
+  ρ=10: pre-computing HD KNN at k=30 ...
+    seed=191664964 standard (γ=1.0) ...
+    seed=191664964 smooth (γ=0.7) ...
+  checkpoint: ρ=10 seed=191664964 saved
