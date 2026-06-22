@@ -67,6 +67,7 @@ experiments (driver scripts, data loaders, datasets, and results) lives under
 | [experiments/smooth_tsne_opentsne_gamma.py](experiments/smooth_tsne_opentsne_gamma.py) | **Driver A** — Experiments 1–10: standard vs. smooth vs. sharp t-SNE. |
 | [experiments/compare_affinity_variants.py](experiments/compare_affinity_variants.py) | **Driver B** — compares 9 affinity kernels by Neighborhood Overlap. |
 | [experiments/data/load_data.py](experiments/data/load_data.py) | Dataset loaders (MNIST, mouse cortex, adult census) + `rnaseqTools.py` and the dataset files. |
+| [experiments/data/build_mouse_pickle.py](experiments/data/build_mouse_pickle.py) | Rebuilds `tasic2018.pickle` from the raw Allen Institute downloads (see §3). |
 | [experiments/results/](experiments/results/) | Generated CSVs + PNGs. Driver A → `<dataset>_gamma_tsne/`, Driver B → `affinity_comparison_<dataset>/`. |
 | [experiments/logs/](experiments/logs/) | Captured stdout from full runs. |
 | `Appendix.pdf` | Write-up of the results. |
@@ -91,6 +92,41 @@ All experiments accept `--dataset {mnist, mouse, adult}`. Loaders are in
 
 > The pickle and `.h5ad` data files are large and are git-ignored — confirm the
 > files under `experiments/data/` exist before running the `mouse` dataset.
+
+### Building the mouse pickle from raw data
+
+`experiments/data/tasic2018.pickle` is preprocessed from the Tasic et al. (2018)
+mouse-cortex scRNA-seq dataset. To rebuild it from scratch:
+
+1. **Download the raw exon matrices** from the Allen Institute
+   ([browse all files](http://celltypes.brain-map.org/rnaseq)):
+
+   | File | Direct link |
+   |------|-------------|
+   | VISp exon matrix + gene rows | <http://celltypes.brain-map.org/api/v2/well_known_file_download/694413985> |
+   | ALM exon matrix | <http://celltypes.brain-map.org/api/v2/well_known_file_download/694413179> |
+
+   Unpack them to get `mouse_VISp_2018-06-14_exon-matrix.csv`,
+   `mouse_VISp_2018-06-14_genes-rows.csv`, and
+   `mouse_ALM_2018-06-14_exon-matrix.csv`.
+
+2. **Download the cluster/colour annotations** —
+   [`tasic-sample_heatmap_plot_data.csv`](https://github.com/berenslab/rna-seq-tsne/blob/master/data/tasic-sample_heatmap_plot_data.csv)
+   from [berenslab/rna-seq-tsne](https://github.com/berenslab/rna-seq-tsne).
+
+3. Place all four CSVs in one directory (default
+   `experiments/data/tasic-nature/`) and run:
+
+   ```bash
+   python experiments/data/build_mouse_pickle.py \
+       --raw_dir experiments/data/tasic-nature \
+       --out experiments/data/tasic2018.pickle
+   ```
+
+   This writes `tasic2018.pickle`; `importantGenesTasic2018.npy` is then
+   generated on first use by `load_mouse_data`. See
+   [experiments/data/build_mouse_pickle.py](experiments/data/build_mouse_pickle.py)
+   for details.
 
 ---
 

@@ -125,6 +125,21 @@ _CB_PALETTE = [
     "#0072B2", "#D55E00", "#CC79A7", "#000000",
 ]
 
+# ─── Semantic colours for the γ comparison (Okabe–Ito, colourblind-safe) ─────
+# One colour per role, used consistently across every discrete standard/smooth/
+# sharp/matched plot (exp 1, 2, 7, 9, 10).  The two series compared most often —
+# standard and smooth — are blue vs orange, the most reliably separable
+# colourblind-safe pair (they differ in BOTH hue and luminance, so they also
+# read clearly in greyscale).  "matched" is a standard run at a different
+# perplexity, so it stays in the blue family (sky-blue) while orange keeps the
+# key smooth line visually distinct.
+#   NB: the continuous γ-sweep plots (exp 4, 6, 8) intentionally use a separate
+#   cool→warm gradient (Blues for γ<1, Reds for γ>1) and are left untouched.
+C_STANDARD = "#0072B2"   # blue            — standard t-SNE (γ=1.0)
+C_SMOOTH   = "#E69F00"   # orange          — smooth   t-SNE (γ<1)
+C_SHARP    = "#CC79A7"   # reddish-purple  — sharp    t-SNE (γ>1)
+C_MATCHED  = "#56B4E9"   # sky-blue        — standard at matched perplexity (exp7)
+
 # Exp8 fixed colors per perplexity value (colorblind-friendly)
 _EXP8_COLORS = {
     30:  "#0072B2",  # blue
@@ -416,10 +431,15 @@ def _run_sensitivity_grid(X_pca, X_eval, gammas, perplexities, out_dir,
 # =============================================================================
 
 def exp1_affinity_sharpness(P_cond, knn_idx, out_dir,
-                              perplexity=30, gamma_s=0.5):
+                              perplexity=30, gamma_s=0.5, top_ranks=20):
     """
-    Bar chart of P(j|i) vs neighbour rank for a single representative point:
-    (a) standard t-SNE  (b) after smoothing with gamma_s.
+    Grouped bar chart of P(j|i) vs neighbour rank for a single representative
+    point: for each rank, two side-by-side bars compare
+    (a) standard t-SNE  and  (b) smoothing with gamma_s.
+
+    Only the ``top_ranks`` highest-ranked neighbours are drawn (the tail
+    probabilities are vanishingly small and would clutter the chart); the CSV
+    still records every rank.
 
     P_cond, knn_idx come from build_affinity(..., gamma=1.0).
     CSV: affinity_rows.csv
@@ -447,15 +467,23 @@ def exp1_affinity_sharpness(P_cond, knn_idx, out_dir,
         f"p_smooth_gamma{gamma_s}": vals_smo,
     }).to_csv(os.path.join(plots_dir, "affinity_rows.csv"), index=False)
 
-    C_STD_1 = "#0072B2"
-    C_SMO_1 = "#009E73"
+    C_STD_1 = C_STANDARD
+    C_SMO_1 = C_SMOOTH
 
-    fig, ax = plt.subplots(figsize=(7, 4))
-    ax.plot(ranks, vals_std, color=C_STD_1, lw=2, label=f"Standard  (ρ={perplexity},  γ=1.0)")
-    ax.plot(ranks, vals_smo, color=C_SMO_1, lw=2, label=f"Smooth  (ρ={perplexity},  γ={gamma_s})")
+    n_show = min(top_ranks, k_hd)
+    x      = np.arange(n_show)
+    width  = 0.4
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.bar(x - width / 2, vals_std[:n_show], width, color=C_STD_1,
+           label=f"Standard  (ρ={perplexity},  γ=1.0)")
+    ax.bar(x + width / 2, vals_smo[:n_show], width, color=C_SMO_1,
+           label=f"Smooth  (ρ={perplexity},  γ={gamma_s})")
     ax.set_xlabel("Neighbor rank")
     ax.set_ylabel("Conditional probability  P(j|i)")
     ax.set_title(f"(a) Affinity row sharpness  (ρ={perplexity})")
+    ax.set_xticks(x)
+    ax.set_xticklabels(ranks[:n_show])
     ax.legend(frameon=False)
     _clean_axes(ax)
     plt.tight_layout()
@@ -494,9 +522,9 @@ def exp2_effective_perplexity(P_cond_base, P_cond_smooth, P_cond_sharp,
               index=False)
 
     triples = [
-        (ep_std, f"standard  (ρ={perplexity})", "#0072B2"),
-        (ep_smo, f"smooth  γ={gamma_s}",        "#009E73"),
-        (ep_shp, f"sharp  γ={gamma_h}",         "#8B4DB0"),
+        (ep_std, f"standard  (ρ={perplexity})", C_STANDARD),
+        (ep_smo, f"smooth  γ={gamma_s}",        C_SMOOTH),
+        (ep_shp, f"sharp  γ={gamma_h}",         C_SHARP),
     ]
     n_pts   = len(ep_std)
     varying = [d for d, _, _ in triples if d.std() >= _CONST_THR]
@@ -882,9 +910,9 @@ def exp7_nh_comparison(X_pca, X_eval, out_dir,
     k_values  = np.arange(1, k_max + 1)
     seeds     = _make_seeds(master_seed, n_runs)
     csv_path  = os.path.join(plots_dir, "neighborhood_overlap_comparison.csv")
-    C_STD7    = "#0072B2"
-    C_SMO7    = "#009E73"
-    C_MATCHED = "#E69F00"
+    C_STD7    = C_STANDARD
+    C_SMO7    = C_SMOOTH
+    C_MAT7    = C_MATCHED
 
     label_std = f"standard  ρ={perplexity}"
     label_smo = f"smooth  γ={gamma_s}"
@@ -968,7 +996,7 @@ def exp7_nh_comparison(X_pca, X_eval, out_dir,
 
     def _style7(lbl):
         if "smooth"  in lbl.lower(): return C_SMO7,    "--", 2.2
-        if "matched" in lbl.lower(): return C_MATCHED,  "-", 2.0
+        if "matched" in lbl.lower(): return C_MAT7,     "-", 2.0
         return C_STD7, "-", 2.6
 
     val_cols = [c for c in val_cols if "sharp" not in c.lower()]
@@ -1164,8 +1192,8 @@ def exp9_smooth_vs_envelope(X_pca, X_eval, out_dir,
         return
 
     # ── Compute per-seed envelopes ────────────────────────────────────────────
-    C_STD_LOC   = "#0072B2"
-    C_GREEN_LOC = "#009E73"
+    C_STD_LOC   = C_STANDARD
+    C_GREEN_LOC = C_SMOOTH
     env_std_per_seed   = []
     env_smo_per_seed   = []
     std_winner_per_seed = []
@@ -1318,8 +1346,8 @@ def exp10_no_vs_perplexity(X_pca, X_eval, out_dir,
         return
 
     # ── Plot: thin seeds + bold mean ─────────────────────────────────────────
-    C_STD_LOC   = "#0072B2"
-    C_GREEN_LOC = "#009E73"
+    C_STD_LOC   = C_STANDARD
+    C_GREEN_LOC = C_SMOOTH
 
     def _plot10(std_col, smo_col, ylabel, title, fname):
         p_ax      = np.sort(out_df["perplexity"].unique())
@@ -1440,14 +1468,21 @@ def plot_all_from_csv(args):
         smo_col  = [c for c in df1.columns if c.startswith("p_smooth")][0]
         vals_smo = df1[smo_col].values
         gamma_s1 = float(smo_col.split("gamma")[-1])
-        C_STD_1 = "#0072B2"
-        C_SMO_1 = "#009E73"
-        fig, ax = plt.subplots(figsize=(7, 4))
-        ax.plot(ranks, vals_std, color=C_STD_1, lw=2, label=f"Standard  (ρ={args.perplexity},  γ=1.0)")
-        ax.plot(ranks, vals_smo, color=C_SMO_1, lw=2, label=f"Smooth  (ρ={args.perplexity},  γ={gamma_s1})")
+        C_STD_1 = C_STANDARD
+        C_SMO_1 = C_SMOOTH
+        n_show = min(args.exp1_top_ranks, len(ranks))
+        x      = np.arange(n_show)
+        width  = 0.4
+        fig, ax = plt.subplots(figsize=(9, 4))
+        ax.bar(x - width / 2, vals_std[:n_show], width, color=C_STD_1,
+               label=f"Standard  (ρ={args.perplexity},  γ=1.0)")
+        ax.bar(x + width / 2, vals_smo[:n_show], width, color=C_SMO_1,
+               label=f"Smooth  (ρ={args.perplexity},  γ={gamma_s1})")
         ax.set_xlabel("Neighbor rank")
         ax.set_ylabel("Conditional probability  P(j|i)")
         ax.set_title(f"(a) Affinity row sharpness  (ρ={args.perplexity})")
+        ax.set_xticks(x)
+        ax.set_xticklabels(ranks[:n_show])
         ax.legend(frameon=False)
         _clean_axes(ax)
         plt.tight_layout()
@@ -1466,9 +1501,9 @@ def plot_all_from_csv(args):
         gh = float(col_shp.split("_g")[-1])
         _CONST_THR = 0.005
         triples = [
-            (df2[col_std].values, f"standard  (ρ={args.perplexity})", "#0072B2"),
-            (df2[col_smo].values, f"smooth  γ={gs}",                  "#009E73"),
-            (df2[col_shp].values, f"sharp  γ={gh}",                   "#8B4DB0"),
+            (df2[col_std].values, f"standard  (ρ={args.perplexity})", C_STANDARD),
+            (df2[col_smo].values, f"smooth  γ={gs}",                  C_SMOOTH),
+            (df2[col_shp].values, f"sharp  γ={gh}",                   C_SHARP),
         ]
         n_pts   = len(triples[0][0])
         varying = [d for d, _, _ in triples if d.std() >= _CONST_THR]
@@ -1650,9 +1685,9 @@ def plot_all_from_csv(args):
         df7 = pd.read_csv(_csv(plots_dir, "neighborhood_overlap_comparison.csv"))
         if "seed" not in df7.columns:
             df7["seed"] = 0
-        C_STD7    = "#0072B2"
-        C_SMO7    = "#009E73"
-        C_MATCHED7 = "#E69F00"
+        C_STD7    = C_STANDARD
+        C_SMO7    = C_SMOOTH
+        C_MATCHED7 = C_MATCHED
         val_cols  = [c for c in df7.columns
                      if c not in ("k", "seed") and "sharp" not in c.lower()]
         k_vals_plot = np.sort(df7["k"].unique())
@@ -1725,8 +1760,8 @@ def plot_all_from_csv(args):
         if "seed" not in df9.columns:
             df9["seed"] = 0
         gamma_s9  = args.gamma_s
-        C_STD_LOC   = "#0072B2"
-        C_GREEN_LOC = "#009E73"
+        C_STD_LOC   = C_STANDARD
+        C_GREEN_LOC = C_SMOOTH
         std_cols9 = [c for c in df9.columns if c.startswith("standard_p")]
         smo_cols9 = [c for c in df9.columns if c.startswith("smooth_p")]
         perps9    = sorted([int(c.split("_p")[-1]) for c in std_cols9])
@@ -1800,8 +1835,8 @@ def plot_all_from_csv(args):
                          if c.startswith("smooth_gamma") and c.endswith("_auc")][0]
         gamma_s10 = float(smo_no_col10.replace("smooth_gamma", "").replace("_no", ""))
         k_eval10  = args.exp10_k_eval
-        C_STD_LOC   = "#0072B2"
-        C_GREEN_LOC = "#009E73"
+        C_STD_LOC   = C_STANDARD
+        C_GREEN_LOC = C_SMOOTH
 
         def _plot10_only(std_col, smo_col, ylabel, title, fname):
             seed_list = df10["seed"].unique()
@@ -1879,6 +1914,9 @@ def parse_args():
     p.add_argument("--exp10_k_eval",      type=int,  default=30)
     p.add_argument("--exp1_gamma",        type=float, default=0.5,
                    help="gamma_s shown in exp1 bar chart.")
+    p.add_argument("--exp1_top_ranks",    type=int,   default=20,
+                   help="Number of top neighbour ranks to draw in the exp1 "
+                        "grouped bar chart.")
     p.add_argument("--n_runs",           type=int,   default=10,
                    help="Number of random seeds per experiment.")
     for i in range(1, 11):
@@ -1938,6 +1976,7 @@ def main():
         exp1_affinity_sharpness(
             P_cnd_base, knn_idx_base, args.out_dir,
             perplexity=args.perplexity, gamma_s=args.exp1_gamma,
+            top_ranks=args.exp1_top_ranks,
         )
 
     if not args.skip_exp2:
