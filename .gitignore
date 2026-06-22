@@ -8,3 +8,9 @@ dist/
 .ipynb_checkpoints/
 .DS_STORE
 *.cpp
+
+# large / regenerable data files
+*.pickle
+*.h5ad
+experiments/data/tasic2018.pickle
+experiments/data/pbmc3k_processed.h5ad
