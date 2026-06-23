@@ -107,6 +107,9 @@ def load_mnist_data(n_pca=50, random_state=42):
     """
     Load MNIST (70 000 × 784), normalise to [0, 1], reduce to `n_pca` dims.
 
+    fetch_openml returns the full dataset (60k train + 10k test = 70k); the
+    whole 70k is embedded, matching standard t-SNE practice.
+
     Returns
     -------
     X_pca : ndarray, shape (70000, n_pca)

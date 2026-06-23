@@ -348,7 +348,7 @@ def plot_nh_curves(df, out_dir, k_max=None, dataset="mnist"):
     ax.set_ylabel("NH@k  (Neighbourhood Overlap)")
     _prefix = "(b) " if dataset == "mnist" else ""
     ax.set_title(f"{_prefix}Affinity variants — NH@k on {dataset.upper()}")
-    ax.legend(frameon=False)
+    ax.legend(frameon=False, ncol=2, loc="lower right")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
