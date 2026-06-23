@@ -474,7 +474,7 @@ def exp1_affinity_sharpness(P_cond, knn_idx, out_dir,
     x      = np.arange(n_show)
     width  = 0.4
 
-    fig, ax = plt.subplots(figsize=(9, 4))
+    fig, ax = plt.subplots(figsize=(9, 5.6))
     ax.bar(x - width / 2, vals_std[:n_show], width, color=C_STD_1,
            label=f"Standard  (ρ={perplexity},  γ=1.0)")
     ax.bar(x + width / 2, vals_smo[:n_show], width, color=C_SMO_1,
@@ -1473,7 +1473,7 @@ def plot_all_from_csv(args):
         n_show = min(args.exp1_top_ranks, len(ranks))
         x      = np.arange(n_show)
         width  = 0.4
-        fig, ax = plt.subplots(figsize=(9, 4))
+        fig, ax = plt.subplots(figsize=(9, 5.6))
         ax.bar(x - width / 2, vals_std[:n_show], width, color=C_STD_1,
                label=f"Standard  (ρ={args.perplexity},  γ=1.0)")
         ax.bar(x + width / 2, vals_smo[:n_show], width, color=C_SMO_1,
