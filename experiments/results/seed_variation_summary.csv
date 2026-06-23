@@ -47,6 +47,9 @@ adult_gamma_tsne,adult_gamma_tsne/sensitivity_grid,AUC_11_90,5,28,0.000453405211
 adult_gamma_tsne,adult_gamma_tsne/sensitivity_grid,AUC_1_10,5,28,0.0005196166562756263,0.001794005354306456
 adult_gamma_tsne,adult_gamma_tsne/sensitivity_grid,global_spearman,5,28,0.0016907248216871194,0.004956733583197703
 adult_gamma_tsne,adult_gamma_tsne/sensitivity_grid,median_eff_perp,5,28,0.0,0.0
+affinity_comparison_adult,affinity_comparison_adult,nh_score,5,1800,0.0010049272722094445,0.0026321885697393873
+affinity_comparison_mnist,affinity_comparison_mnist,nh_score,5,1800,0.00033248118665485724,0.0011745168350936015
+affinity_comparison_mouse,affinity_comparison_mouse,nh_score,5,1800,0.000609369967263798,0.0017804341562742151
 mnist_gamma_tsne,mnist_gamma_tsne/exp10_no_vs_perplexity,smooth_gamma0.7_auc,5,13,0.0005088816701488798,0.0014137211759807982
 mnist_gamma_tsne,mnist_gamma_tsne/exp10_no_vs_perplexity,smooth_gamma0.7_no,5,13,0.0004078789669276202,0.0007287614598111844
 mnist_gamma_tsne,mnist_gamma_tsne/exp10_no_vs_perplexity,standard_auc,5,13,0.00025329290989339334,0.0005234748103102667
