@@ -71,6 +71,8 @@ from sklearn.neighbors import NearestNeighbors
 from openTSNE import TSNEEmbedding, initialization
 from openTSNE.affinity import PerplexityBasedNN, joint_probabilities_nn
 
+import baselines  # external DR methods (pacmap / umap / trimap / autoencoder)
+
 # data loaders live in ../experiments/data
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _EXP_DATA_DIR = os.path.join(_SCRIPT_DIR, "..", "experiments", "data")
@@ -271,6 +273,30 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
     return models
 
 
+def make_external_models(methods="all", ae_epochs=150):
+    """External DR baselines (pacmap / umap / trimap / autoencoder).
+
+    ``methods`` is "all" or a comma-separated subset. Only methods whose
+    library is installed are returned, so the run degrades gracefully.
+    """
+    avail = baselines.available_methods()
+    if methods != "all":
+        wanted = {m.strip() for m in methods.split(",") if m.strip()}
+        avail = {k: v for k, v in avail.items() if k in wanted}
+
+    models = {}
+    for name, fn in avail.items():
+        if name == "autoencoder":
+            # bind epochs without leaking the loop variable
+            def _ae(X, random_state, n_jobs=-1, _fn=fn, _ep=ae_epochs):
+                return _fn(X, random_state=random_state, epochs=_ep,
+                           n_jobs=n_jobs)
+            models[name] = {"kind": "external", "group": "external", "fn": _ae}
+        else:
+            models[name] = {"kind": "external", "group": "external", "fn": fn}
+    return models
+
+
 # =============================================================================
 # Driver
 # =============================================================================
@@ -307,6 +333,10 @@ def run_all(args, out_dir):
     k_values = np.arange(1, 91)
     models = make_models(args.total_iter, args.ee_iter, args.ee,
                          args.gamma_smooth, args.gamma_sharp)
+    if not args.no_external:
+        ext = make_external_models(args.methods, ae_epochs=args.ae_epochs)
+        models.update(ext)
+        print(f"  external baselines: {list(ext)}")
     print(f"Models ({len(models)}): {list(models)}")
 
     print(f"\nLoading {args.dataset} (n_samples={args.n_samples}) ...")
@@ -343,6 +373,10 @@ def run_all(args, out_dir):
                 Y = run_single(P, init.copy(), spec["n_iter_ee"],
                                spec["n_iter_main"], spec["ee"],
                                n_jobs=args.n_jobs, random_state=seed)
+            elif spec["kind"] == "external":
+                # external methods run on the same PCA features and seed, but
+                # use their own initialization / optimizer internally.
+                Y = spec["fn"](X_pca, random_state=seed, n_jobs=args.n_jobs)
             else:
                 Y = run_curriculum(spec["stages"], init.copy(),
                                    knn_idx, knn_dist, eff_perp,
@@ -392,13 +426,17 @@ def summarize(df):
     return g
 
 
+_GROUP_COLOR = {"baseline": "#888888", "curriculum": "#0072B2",
+                "external": "#E69F00"}
+_GROUP_MARKER = {"baseline": "s", "curriculum": "o", "external": "^"}
+
+
 def make_plots(df, summary, out_dir, dataset):
     # 1) grouped bar chart of the three metrics per model
-    fig, axes = plt.subplots(1, 3, figsize=(17, 6))
+    fig, axes = plt.subplots(1, 3, figsize=(18, 7))
     order = (summary.sort_values("group")["model"].tolist())
     s = summary.set_index("model").reindex(order)
-    colors = ["#888888" if g == "baseline" else "#0072B2"
-              for g in s["group"]]
+    colors = [_GROUP_COLOR.get(g, "#0072B2") for g in s["group"]]
     specs = [("local_mean", "local_std", "Local  NH AUC (k=1–10)"),
              ("mid_mean", "mid_std", "Mid  NH AUC (k=11–90)"),
              ("global_mean", "global_std", "Global  Spearman ρ")]
@@ -411,24 +449,31 @@ def make_plots(df, summary, out_dir, dataset):
         ax.set_title(title)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-    fig.suptitle(f"Curriculum-γ t-SNE — {dataset}  "
-                 f"(grey=baseline, blue=curriculum)", fontsize=14)
+    fig.suptitle(f"Curriculum-γ t-SNE vs baselines — {dataset}  "
+                 f"(grey=fixed-γ, blue=curriculum, orange=external DR)",
+                 fontsize=14)
     plt.tight_layout()
     p1 = os.path.join(out_dir, f"{dataset}_metrics_bars.png")
     plt.savefig(p1, dpi=150, bbox_inches="tight")
     plt.close()
 
     # 2) trade-off scatter: local vs global, sized by mid
-    fig, ax = plt.subplots(figsize=(8, 7))
+    fig, ax = plt.subplots(figsize=(9, 7.5))
     for _, r in summary.iterrows():
-        is_base = r["group"] == "baseline"
+        g = r["group"]
         ax.scatter(r["local_mean"], r["global_mean"],
-                   s=140, c=("#888888" if is_base else "#0072B2"),
-                   marker=("s" if is_base else "o"),
+                   s=150, c=_GROUP_COLOR.get(g, "#0072B2"),
+                   marker=_GROUP_MARKER.get(g, "o"),
                    edgecolors="black", zorder=3)
         ax.annotate(r["model"].replace("baseline_", "").replace("curric_", ""),
                     (r["local_mean"], r["global_mean"]),
                     fontsize=7, xytext=(4, 4), textcoords="offset points")
+    handles = [plt.Line2D([0], [0], marker=_GROUP_MARKER[g], color="w",
+                          markerfacecolor=_GROUP_COLOR[g], markersize=11,
+                          markeredgecolor="black", label=g)
+               for g in ("baseline", "curriculum", "external")
+               if (summary["group"] == g).any()]
+    ax.legend(handles=handles, frameon=False, loc="best")
     ax.set_xlabel("Local  NH AUC (k=1–10)   →  better")
     ax.set_ylabel("Global  Spearman ρ   →  better")
     ax.set_title(f"Local–Global trade-off — {dataset}\n"
@@ -530,6 +575,30 @@ def verdict(summary, out_dir, dataset):
             "(stronger sharp γ, smoother global γ, longer local stage), or "
             "the trade-off may be fundamental for this data.")
 
+    # ── Comparison against external DR methods ───────────────────────────────
+    ext = summary[summary["group"] == "external"].set_index("model")
+    if not ext.empty:
+        lines.append("\n## vs external DR methods\n")
+        lines.append(ext[["local_mean", "mid_mean", "global_mean"]]
+                     .round(4).to_string())
+        bc_local, bc_global = bc["local_mean"], bc["global_mean"]
+        lines.append(
+            f"\nBest curriculum (**{bc['model']}**): "
+            f"local={bc_local:.4f}, global={bc_global:.4f}.\n")
+        for mname, r in ext.iterrows():
+            wins = []
+            if bc_local >= r["local_mean"]:
+                wins.append("local")
+            if bc_global >= r["global_mean"]:
+                wins.append("global")
+            if r["mid_mean"] <= bc["mid_mean"]:
+                wins.append("mid")
+            verdict_txt = ("ties/beats on " + ", ".join(wins)) if wins \
+                else "loses on all scales"
+            lines.append(
+                f"- vs **{mname}** (local={r['local_mean']:.4f}, "
+                f"global={r['global_mean']:.4f}): curriculum {verdict_txt}.")
+
     report = "\n".join(lines)
     path = os.path.join(out_dir, f"{dataset}_VERDICT.md")
     with open(path, "w") as f:
@@ -569,6 +638,15 @@ def main():
                     help="early-exaggeration iterations (== global stage length)")
     ap.add_argument("--ee", type=float, default=12.0,
                     help="early-exaggeration factor")
+
+    # external DR baselines
+    ap.add_argument("--methods", default="all",
+                    help="external baselines: 'all' or comma-separated subset "
+                         "of pacmap,umap,trimap,autoencoder")
+    ap.add_argument("--no_external", action="store_true",
+                    help="skip external baselines, run only γ models")
+    ap.add_argument("--ae_epochs", type=int, default=150,
+                    help="training epochs for the autoencoder baseline")
 
     ap.add_argument("--out_dir", default=None)
     ap.add_argument("--fresh", action="store_true",
