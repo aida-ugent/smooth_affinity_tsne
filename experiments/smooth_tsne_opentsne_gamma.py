@@ -1389,6 +1389,134 @@ def exp10_no_vs_perplexity(X_pca, X_eval, out_dir,
 
 
 # =============================================================================
+# Experiment 11 – Embedding grid: perplexity (cols) × gamma (rows)
+# =============================================================================
+
+def _dataset_point_colors(labels, dataset, cluster_colors_arr=None,
+                          color_hex=None):
+    """Return (point_colors, legend_handles, legend_title) for a dataset.
+
+    Shared colour logic for the embedding-grid plot.  If ``color_hex`` is
+    provided (e.g. when replotting from a saved CSV) it is used verbatim for
+    the per-point colours; otherwise colours are derived from the labels.
+    """
+    if dataset == "mnist":
+        palette = plt.cm.tab10(np.linspace(0, 0.9, 10))
+        digits  = np.array([int(d) for d in labels])
+        point_colors = color_hex if color_hex is not None else palette[digits]
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markersize=8,
+                   markerfacecolor=palette[d], label=str(d))
+            for d in range(10)
+        ]
+        return point_colors, legend_handles, "Digit"
+
+    if dataset == "adult":
+        pal = {0: "#4393C3", 1: "#D6604D"}
+        point_colors = (color_hex if color_hex is not None
+                        else [pal[int(v)] for v in labels])
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markersize=8,
+                   markerfacecolor=pal[v],
+                   label="Income ≤50K" if v == 0 else "Income >50K")
+            for v in [0, 1]
+        ]
+        return point_colors, legend_handles, "Income"
+
+    # mouse
+    if color_hex is not None:
+        point_colors = color_hex
+    elif cluster_colors_arr is not None:
+        point_colors = cluster_colors_arr[np.asarray(labels).astype(int)]
+    else:
+        point_colors = "#444444"
+    return point_colors, _mouse_major_legend_handles(), "Cell type"
+
+
+def exp11_embedding_grid(X_pca, y, out_dir,
+                          dataset="mnist",
+                          gammas=(0.0, 0.7, 1.0, 1.5, 2.0),
+                          perplexities=(30, 50, 100, 200),
+                          cluster_colors_arr=None,
+                          n_jobs=-1, random_state=42,
+                          n_iter_ee=250, n_iter_main=750, ee=12,
+                          point_size=3, alpha=0.8):
+    """Grid of t-SNE embeddings: one column per perplexity, one row per gamma.
+
+    Like exp6 it sweeps the (perplexity, gamma) plane, but instead of a
+    sensitivity heatmap it draws the actual embedding in every cell so the
+    qualitative effect of smoothing/sharpening can be read off directly.
+
+    CSV: embedding_grid.csv  (x, y, label, color, perplexity, gamma)
+    """
+    print(f"\n--- Exp 11: Embedding grid ρ×γ ({dataset}) ---")
+    plots_dir = os.path.join(out_dir, "exp11_embedding_grid")
+    os.makedirs(plots_dir, exist_ok=True)
+    _plot_save_dir[0] = plots_dir
+
+    gammas = list(gammas)
+    perps  = list(perplexities)
+
+    point_colors, legend_handles, legend_title = _dataset_point_colors(
+        y, dataset, cluster_colors_arr=cluster_colors_arr)
+    color_hex = [matplotlib.colors.to_hex(c) for c in point_colors]
+    y_str     = [str(yi) for yi in y]
+
+    # ── Run every (perplexity, gamma) cell, collecting embeddings ────────────
+    embeddings = {}                       # (p, g) -> (N,2) array
+    rows = []                             # for the persisted CSV
+    for p in perps:
+        for g in gammas:
+            print(f"  ρ={p}, γ={g} ...")
+            Y = run_tsne(X_pca, perplexity=p, gamma=g,
+                         random_state=random_state, n_jobs=n_jobs,
+                         n_iter_ee=n_iter_ee, n_iter_main=n_iter_main, ee=ee)
+            embeddings[(p, g)] = Y
+            rows.append(pd.DataFrame({
+                "x": Y[:, 0], "y": Y[:, 1],
+                "label": y_str, "color": color_hex,
+                "perplexity": p, "gamma": g,
+            }))
+    pd.concat(rows, ignore_index=True).to_csv(
+        os.path.join(plots_dir, "embedding_grid.csv"), index=False)
+
+    _plot_embedding_grid(embeddings, perps, gammas, point_colors,
+                         legend_handles, legend_title, dataset,
+                         point_size=point_size, alpha=alpha)
+    print(f"  Exp 11 done → {plots_dir}")
+
+
+def _plot_embedding_grid(embeddings, perps, gammas, point_colors,
+                         legend_handles, legend_title, dataset,
+                         point_size=3, alpha=0.8):
+    """Render the perplexity (cols) × gamma (rows) grid of scatter plots."""
+    n_rows, n_cols = len(gammas), len(perps)
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(3.0 * n_cols, 3.0 * n_rows),
+                             squeeze=False)
+    for i, g in enumerate(gammas):
+        for j, p in enumerate(perps):
+            ax = axes[i][j]
+            Y = np.asarray(embeddings[(p, g)])
+            ax.scatter(Y[:, 0], Y[:, 1], c=point_colors,
+                       s=point_size, alpha=alpha, edgecolors="none",
+                       rasterized=True)
+            ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values():
+                sp.set_visible(False)
+            if i == 0:
+                ax.set_title(f"ρ = {p}", fontsize=14)
+            if j == 0:
+                ax.set_ylabel(f"γ = {g}", fontsize=14)
+    if legend_handles:
+        fig.legend(handles=legend_handles, title=legend_title,
+                   fontsize=12, title_fontsize=12, frameon=False,
+                   loc="center left", bbox_to_anchor=(1.0, 0.5))
+    plt.tight_layout()
+    _save_fig("11_embedding_grid")
+
+
+# =============================================================================
 # Data loading
 # =============================================================================
 
@@ -1871,6 +1999,31 @@ def plot_all_from_csv(args):
                      "10b_auc_vs_perplexity")
         print("  Exp 10 replotted.")
 
+    # ── Exp 11 ────────────────────────────────────────────────────────────────
+    if not args.skip_exp11:
+        plots_dir = os.path.join(out_dir, "exp11_embedding_grid")
+        _plot_save_dir[0] = plots_dir
+        df11 = pd.read_csv(_csv(plots_dir, "embedding_grid.csv"))
+        perps  = sorted(df11["perplexity"].unique())
+        gammas = sorted(df11["gamma"].unique())
+        embeddings = {}
+        for p in perps:
+            for g in gammas:
+                cell = df11[(df11["perplexity"] == p) & (df11["gamma"] == g)]
+                embeddings[(p, g)] = cell[["x", "y"]].values
+        # Per-point colours/legend are reconstructed from the first cell, whose
+        # row order matches every other cell (same input matrix, same labels).
+        first = df11[(df11["perplexity"] == perps[0]) &
+                     (df11["gamma"] == gammas[0])]
+        color_hex = (first["color"].values if "color" in first.columns
+                     else None)
+        _, legend_handles, legend_title = _dataset_point_colors(
+            first["label"].values, args.dataset, color_hex=color_hex)
+        point_colors = color_hex if color_hex is not None else "#444444"
+        _plot_embedding_grid(embeddings, perps, gammas, point_colors,
+                             legend_handles, legend_title, args.dataset)
+        print("  Exp 11 replotted.")
+
     print(f"\nAll plots regenerated in: {out_dir}\n")
 
 
@@ -1917,9 +2070,15 @@ def parse_args():
     p.add_argument("--exp1_top_ranks",    type=int,   default=20,
                    help="Number of top neighbour ranks to draw in the exp1 "
                         "grouped bar chart.")
+    p.add_argument("--exp11_gammas",     type=float, nargs="+",
+                   default=[0.0, 0.7, 1.0, 1.5, 2.0],
+                   help="gamma values (rows) for the exp11 embedding grid.")
+    p.add_argument("--exp11_perps",      type=int,   nargs="+",
+                   default=[30, 50, 100, 200],
+                   help="perplexity values (cols) for the exp11 embedding grid.")
     p.add_argument("--n_runs",           type=int,   default=10,
                    help="Number of random seeds per experiment.")
-    for i in range(1, 11):
+    for i in range(1, 12):
         p.add_argument(f"--skip_exp{i}", action="store_true")
     p.add_argument("--plot_only", action="store_true",
                    help="Skip computation; regenerate figures from saved CSVs.")
@@ -2075,6 +2234,17 @@ def main():
             perplexities=args.exp10_perplexities,
             k_eval=args.exp10_k_eval, dataset=args.dataset,
             n_jobs=nj, master_seed=args.random_state, n_runs=args.n_runs,
+            n_iter_ee=args.n_iter_ee, n_iter_main=args.n_iter_main, ee=args.ee,
+        )
+
+    if not args.skip_exp11:
+        exp11_embedding_grid(
+            X_pca, y, args.out_dir,
+            dataset=args.dataset,
+            gammas=args.exp11_gammas,
+            perplexities=args.exp11_perps,
+            cluster_colors_arr=extra.get("cluster_colors_arr"),
+            n_jobs=nj, random_state=args.random_state,
             n_iter_ee=args.n_iter_ee, n_iter_main=args.n_iter_main, ee=args.ee,
         )
 
