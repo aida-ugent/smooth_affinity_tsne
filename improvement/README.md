@@ -1,8 +1,8 @@
-# Curriculum-γ t-SNE — study notes
+# Scheduled-γ t-SNE — study notes
 
 *Last updated: 2026-06-25. Branch: `dev-improvements`.*
 
-A self-contained record of the curriculum-γ experiment so we don't lose the
+A self-contained record of the scheduled-γ experiment so we don't lose the
 motivation, design, results, and conclusions. If you read nothing else, read
 the **TL;DR** and the **Recommended recipe**.
 
@@ -46,7 +46,7 @@ Implementation: [../openTSNE/affinity.py](../openTSNE/affinity.py) (search
 `gamma`). Established trade-off (from `../experiments/`): sharp → best local,
 smooth → best global.
 
-## 2. Hypothesis — curriculum over γ
+## 2. Hypothesis — schedule over γ
 
 Form each *scale* of structure with the γ that is best at it, in stages:
 
@@ -61,26 +61,27 @@ Form each *scale* of structure with the γ that is best at it, in stages:
 **recomputing `P` with the new γ from the *same* kNN graph**, then continuing
 gradient descent from the current embedding. So every stage and every fixed-γ
 baseline shares one kNN graph — only the power transform changes. (See
-`joint_P_for_gamma` / `run_curriculum` in [exp.py](exp.py).)
+`joint_P_for_gamma` / `run_schedule` in [exp.py](exp.py).)
 
 ## 4. Files & how to run
 
 | file | what it is |
 |---|---|
-| [exp.py](exp.py) | main experiment: baselines (fixed γ) vs a small set of curriculum schedules vs external DR, with the full metric suite and an automatic verdict. |
+| [exp.py](exp.py) | main experiment: baselines (fixed γ) vs a small set of γ schedules vs external DR, with the full metric suite and an automatic verdict. |
+| [visualize_embeddings.py](visualize_embeddings.py) | renders a paper-style grid of 2-D embeddings coloured by class (one panel per method) on the exact same input — used to sanity-check that the external methods run correctly (see §6b). |
 | [baselines.py](baselines.py) | external DR wrappers: PaCMAP, UMAP, TriMap, and a VAE (2-D latent, posterior mean = embedding). Auto-detects which libs are installed. |
-| [tune_curriculum.py](tune_curriculum.py) | schedule-space *search* (stage count, per-stage γ, durations). Single seed by design — a search, not a significance test. |
+| [tune_schedule.py](tune_schedule.py) | schedule-space *search* (stage count, per-stage γ, durations). Single seed by design — a search, not a significance test. |
 
 ```bash
 # env: graph_tsne_py310  (numpy 1.26, openTSNE editable, pacmap/umap/trimap/torch)
 python exp.py --dataset mnist --n_samples 10000 --n_seeds 3   # main comparison
-python tune_curriculum.py --dataset mnist                      # schedule search
+python tune_schedule.py --dataset mnist                      # schedule search
 python exp.py --dataset mnist --plot_only                      # re-plot/verdict only
 # --quick on either = fast smoke test
 ```
 
-Outputs land in `results/<dataset>_curriculum/` and
-`results/<dataset>_curriculum_tuning/` (csv + curve/scalar plots + a
+Outputs land in `results/<dataset>_schedule/` and
+`results/<dataset>_schedule_tuning/` (csv + curve/scalar plots + a
 `*_VERDICT.md` / `*_TUNING.md`).
 
 ## 5. Metrics — and the "home-field" caveat
@@ -108,9 +109,9 @@ Fixed-γ baselines (γ schedule must beat these):
 | smooth (γ=0.5) | 0.3311 | 0.9789 | 0.9103 | **0.4309** | **0.6527** |
 | standard (γ=1) | 0.4854 | 0.9795 | **0.9268** | 0.3739 | 0.6340 |
 
-Curriculum models:
+Schedule models:
 
-| curriculum | NO@1-10 | trust@10 | knn@10 | spearman | triplet |
+| schedule | NO@1-10 | trust@10 | knn@10 | spearman | triplet |
 |---|---|---|---|---|---|
 | glob0.5_sharp2_no_mid | 0.4993 | 0.9630 | 0.9125 | 0.4208 | 0.6504 |
 | glob0.5_sharp2_split5050 | 0.4960 | 0.9710 | 0.9190 | 0.4227 | 0.6482 |
@@ -120,7 +121,7 @@ Curriculum models:
 | glob1_sharp2_localheavy | 0.4970 | 0.9706 | 0.9184 | 0.3705 | 0.6327 |
 
 > **Front-heavy at scale (10k vs the search's 5k):** the tuning winner posts the
-> **best global of any curriculum** (spearman 0.4249) — its global advantage
+> **best global of any schedule** (spearman 0.4249) — its global advantage
 > transferred — but its 20% local stage under-sharpens at 10k, so NO@1-10 (0.4844)
 > dips just below standard (local_capture ≈ −0.06). At larger n the local stage
 > needs a bigger share; front-heavy is the **global champion**, `no_mid` the
@@ -129,7 +130,7 @@ Curriculum models:
 **Headroom capture** (vs standard, normalised so 0 = standard, 1 = the best
 specialist baseline; local = NO@1-10, global = spearman):
 
-| curriculum | local capture | global capture | min |
+| schedule | local capture | global capture | min |
 |---|---|---|---|
 | **glob0.5_sharp2_no_mid** | **0.86** | **0.82** | **0.82** |
 | glob0.5_sharp2_split5050 | 0.65 | 0.86 | 0.65 |
@@ -144,7 +145,7 @@ Two clear reads:
   a little mid-scale / trust), but the best one grabs ~86% local + ~82% global
   headroom simultaneously — the trade-off is escaped.
 
-**vs external DR** (fair metrics only; best curriculum = `glob0.5_sharp2_no_mid`
+**vs external DR** (fair metrics only; best schedule = `glob0.5_sharp2_no_mid`
 at trust 0.9630 / knn 0.9125 / spearman 0.4208 / triplet 0.6504):
 
 | method | trust@10 | knn@10 | spearman | triplet |
@@ -154,19 +155,46 @@ at trust 0.9630 / knn 0.9125 / spearman 0.4208 / triplet 0.6504):
 | trimap | 0.9444 | 0.8790 | 0.2576 | 0.6113 |
 | vae | 0.9268 | 0.6579 | 0.3584 | 0.6251 |
 
-The curriculum ties/beats **all four** on global (spearman + triplet) and on
+The schedule ties/beats **all four** on global (spearman + triplet) and on
 trust/knn vs all except UMAP's knn (essentially tied).
 
-The **front-heavy tuning winner** is the strongest curriculum on global and
+The **front-heavy tuning winner** is the strongest schedule on global and
 makes the cross-family gap starkest: spearman 0.4249 / triplet 0.6488 vs the
 best external ~0.33 / ~0.625, while staying competitive on the fair local
 metrics (trust 0.9673; knn 0.9098, just behind UMAP's 0.9135). So the
 schedule the search picked for *global* structure is exactly the one that most
 decisively beats PaCMAP/UMAP/TriMap/VAE on the global axis.
 
+## 6b. Are the external methods running correctly? (sanity check)
+
+PaCMAP/UMAP/TriMap score low on `global_spearman`, which looked suspicious — so
+we verified it isn't a setup bug. Two independent checks both say **the methods
+are running correctly; the low score is a metric-choice artifact**:
+
+1. **Their other metrics are fine.** UMAP *ties* t-SNE on knn@10 (0.914 vs
+   0.927), and all three are within ~0.02–0.03 of t-SNE on triplet accuracy
+   (TriMap's *own* paper metric). They look weak **only** on `global_spearman`.
+2. **The embeddings look right.** `visualize_embeddings.py` renders all methods
+   on the same input → `results/mnist_embeddings/mnist_embeddings_grid.png`.
+   PaCMAP/UMAP/TriMap all produce clean, well-separated MNIST digit clusters
+   (as crisp as t-SNE's); the VAE is the only weak one (blobby, knn@10 ≈ 0.59).
+
+**Why the low `global_spearman` is expected, not a bug:** these methods pack
+each class into a compact, roughly equal-size blob separated by large gaps. That
+preserves *neighbourhoods* (high knn/triplet) but deliberately discards the
+absolute pairwise-distance ratios that `global_spearman` measures — it isn't
+their objective. (It also tracks the init confound: t-SNE/PaCMAP/TriMap use PCA
+init, UMAP spectral, and pairwise-distance Spearman rewards PCA-aligned layouts.)
+
+**Honest framing for the writeup:** on a fair shared-input benchmark, the γ
+schedule *matches* these methods on local quality and *beats* them on
+distance-rank global preservation — a metric they don't optimise. Not "they're
+broken". A paper-faithful repro (raw pixels / full 70k / Mammoth) would
+intentionally drop our fair-comparison controls; it's a separate artifact.
+
 ## 7. Schedule search — what's best and why
 
-`tune_curriculum.py` explored 23 schedules (MNIST, 5k points, single seed 42,
+`tune_schedule.py` explored 23 schedules (MNIST, 5k points, single seed 42,
 750-iter budget). A schedule has two independent knobs — the *γ trajectory* and
 the *time split* — and each family freezes one and sweeps the other:
 
@@ -213,13 +241,13 @@ Three patterns from the search:
 
 - [x] Add the front-heavy schedule to `exp.py` and run 3 seeds. **Done.**
       Its *global* advantage transferred (spearman 0.4249 — best of any
-      curriculum, and it beats every external method), but at 10k its short
+      schedule, and it beats every external method), but at 10k its short
       20% local stage under-sharpens, so local dips below standard. Front-heavy
       = global champion; `no_mid` = balanced champion. **Next:** try front-heavy
       with a larger local share (e.g. 50/25/25) to see if it can be balanced too.
 - [ ] Replicate on **mouse** (Tasic scRNA-seq) and **adult** — does the
       50/30/20 recipe transfer, or is the split dataset-dependent?
-- [ ] The curriculum gives up a little **mid-scale / trust**; is that
+- [ ] The schedule gives up a little **mid-scale / trust**; is that
       intrinsic, or recoverable with a slightly longer mid stage?
 - [ ] Tune the **VAE** (it's deliberately vanilla) if a stronger deep baseline
       is wanted — currently weak on knn@10 (0.66).
