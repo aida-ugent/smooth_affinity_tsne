@@ -13,8 +13,8 @@ Methods
   * PaCMAP   — pacmap (the method that inspired the 3-stage idea)
   * UMAP     — umap-learn
   * TriMap   — trimap
-  * AE       — a plain fully-connected autoencoder with a 2-D bottleneck
-               (PyTorch, CPU); the bottleneck activations are the embedding.
+  * VAE      — a variational autoencoder with a 2-D latent (PyTorch, CPU);
+               the posterior mean of the latent is the embedding.
 
 Library availability is detected at import time; ``available_methods()``
 returns only the methods whose dependencies are installed, so ``exp.py``
@@ -64,52 +64,66 @@ def run_trimap(X, random_state=42, n_jobs=-1):
 
 
 # =============================================================================
-# Autoencoder baseline (PyTorch, CPU)
+# Variational autoencoder baseline (PyTorch, CPU)
 # =============================================================================
 
-def run_autoencoder(X, random_state=42, epochs=150, batch_size=256,
-                     lr=1e-3, hidden=(256, 128), n_jobs=-1):
-    """Fully-connected autoencoder; the 2-D bottleneck is the embedding.
+def run_vae(X, random_state=42, epochs=150, batch_size=256, lr=1e-3,
+            hidden=(256, 128), beta=1.0, n_jobs=-1):
+    """Variational autoencoder; the 2-D posterior mean is the embedding.
 
-    Architecture: d -> 256 -> 128 -> 2 (bottleneck) -> 128 -> 256 -> d, ReLU
-    activations, MSE reconstruction loss, Adam. Inputs are standardized first.
-    This is a deliberately standard, un-tuned AE so it represents the
-    "vanilla deep DR" baseline rather than a state-of-the-art one.
+    Encoder  : d -> 256 -> 128 -> (mu[2], logvar[2])
+    Latent   : reparameterized sample z = mu + eps * exp(0.5 * logvar)
+    Decoder  : 2 -> 128 -> 256 -> d
+    Objective: ELBO = MSE reconstruction (summed over features, averaged over
+               the batch) + ``beta`` * KL(q(z|x) || N(0, I)).  Inputs are
+               standardized first.
+
+    Unlike a plain autoencoder, the unit-Gaussian prior + KL term regularize the
+    latent space, so the 2-D code is a smooth, structured embedding rather than
+    just whatever compresses best for reconstruction.  The posterior mean ``mu``
+    is returned as the embedding (standard practice for VAE visualization).
     """
     import torch
     import torch.nn as nn
+    import torch.nn.functional as F
 
     torch.manual_seed(random_state)
     np.random.seed(random_state)
     torch.set_num_threads(max(1, (os_cpu() if n_jobs == -1 else n_jobs)))
 
     X = np.asarray(X, dtype=np.float32)
-    mu, sd = X.mean(0, keepdims=True), X.std(0, keepdims=True) + 1e-8
-    Xn = (X - mu) / sd
+    mu_, sd_ = X.mean(0, keepdims=True), X.std(0, keepdims=True) + 1e-8
+    Xn = (X - mu_) / sd_
     d = Xn.shape[1]
     h1, h2 = hidden
 
-    class AE(nn.Module):
+    class VAE(nn.Module):
         def __init__(self):
             super().__init__()
             self.enc = nn.Sequential(
                 nn.Linear(d, h1), nn.ReLU(),
                 nn.Linear(h1, h2), nn.ReLU(),
-                nn.Linear(h2, 2),
             )
+            self.fc_mu = nn.Linear(h2, 2)
+            self.fc_logvar = nn.Linear(h2, 2)
             self.dec = nn.Sequential(
                 nn.Linear(2, h2), nn.ReLU(),
                 nn.Linear(h2, h1), nn.ReLU(),
                 nn.Linear(h1, d),
             )
 
-        def forward(self, x):
-            z = self.enc(x)
-            return self.dec(z), z
+        def encode(self, x):
+            h = self.enc(x)
+            return self.fc_mu(h), self.fc_logvar(h)
 
-    model = AE()
+        def forward(self, x):
+            mu, logvar = self.encode(x)
+            std = torch.exp(0.5 * logvar)
+            z = mu + std * torch.randn_like(std)
+            return self.dec(z), mu, logvar
+
+    model = VAE()
     opt = torch.optim.Adam(model.parameters(), lr=lr)
-    loss_fn = nn.MSELoss()
     data = torch.from_numpy(Xn)
     n = data.shape[0]
     g = torch.Generator().manual_seed(random_state)
@@ -118,18 +132,21 @@ def run_autoencoder(X, random_state=42, epochs=150, batch_size=256,
     for _ in range(epochs):
         perm = torch.randperm(n, generator=g)
         for i in range(0, n, batch_size):
-            idx = perm[i:i + batch_size]
-            xb = data[idx]
-            recon, _ = model(xb)
-            loss = loss_fn(recon, xb)
+            xb = data[perm[i:i + batch_size]]
+            recon, mu, logvar = model(xb)
+            nb = xb.shape[0]
+            rec = F.mse_loss(recon, xb, reduction="sum") / nb
+            kl = -0.5 * torch.sum(
+                1 + logvar - mu.pow(2) - logvar.exp()) / nb
+            loss = rec + beta * kl
             opt.zero_grad()
             loss.backward()
             opt.step()
 
     model.eval()
     with torch.no_grad():
-        _, z = model(data)
-    return z.numpy().astype(np.float64)
+        mu, _ = model.encode(data)
+    return mu.numpy().astype(np.float64)
 
 
 def os_cpu():
@@ -142,15 +159,15 @@ def os_cpu():
 # =============================================================================
 
 _ALL = {
-    "pacmap":      run_pacmap,
-    "umap":        run_umap,
-    "trimap":      run_trimap,
-    "autoencoder": run_autoencoder,
+    "pacmap": run_pacmap,
+    "umap":   run_umap,
+    "trimap": run_trimap,
+    "vae":    run_vae,
 }
 
 _IMPORT_NAME = {
     "pacmap": "pacmap", "umap": "umap", "trimap": "trimap",
-    "autoencoder": "torch",
+    "vae": "torch",
 }
 
 

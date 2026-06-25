@@ -35,12 +35,16 @@ What this script does
    fair comparison:
       - baselines: standard (γ=1), smooth, sharp
       - a small sweep of 3-stage curriculum configurations
-3. Evaluates each with three metrics that capture the three scales:
-      - LOCAL  : neighborhood-overlap AUC over k=1..10
-      - MID    : neighborhood-overlap AUC over k=11..90
-      - GLOBAL : Spearman correlation of pairwise distances (HD vs LD)
-4. Aggregates over seeds, writes results.csv, draws summary plots, and
-   prints an automatic VERDICT on whether the curriculum idea works.
+3. Evaluates each across the full neighbourhood-size range with two CURVES
+   (saved to curves.csv, drawn as line charts over k=1..K_MAX):
+      - NO@k    : Neighbourhood Overlap — fraction of the true k-NN preserved
+      - Trust@k : Trustworthiness — penalty for false (intruding) neighbours
+   plus three SCALAR metrics (saved to results.csv, drawn as grouped bars):
+      - knn_acc_10     : label kNN purity   (fair local quality)
+      - global_spearman: Spearman ρ of pairwise distances (global)
+      - triplet_acc    : random-triplet distance-ordering accuracy (fair global)
+4. Aggregates over seeds, writes results.csv + curves.csv, draws the plots,
+   and prints an automatic VERDICT on whether the curriculum idea works.
 
 Usage
 -----
@@ -67,11 +71,12 @@ import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 from scipy.spatial.distance import pdist
 from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import pairwise_distances
 
 from openTSNE import TSNEEmbedding, initialization
 from openTSNE.affinity import PerplexityBasedNN, joint_probabilities_nn
 
-import baselines  # external DR methods (pacmap / umap / trimap / autoencoder)
+import baselines  # external DR methods (pacmap / umap / trimap / vae)
 
 # data loaders live in ../experiments/data
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -81,34 +86,102 @@ from load_data import load_mnist_data, load_mouse_data, load_adult_data  # noqa:
 
 
 # =============================================================================
-# Metrics  (identical formulas to experiments/smooth_tsne_opentsne_gamma.py)
+# Metrics
 # =============================================================================
+# Each embedding is characterised at EVERY neighbourhood size k = 1..K with two
+# curves, plus three scalar summary metrics:
+#
+#   curves (curves.csv → line charts)
+#     * NO@k    — Neighbourhood Overlap: fraction of each point's k high-D
+#                 nearest neighbours that are still among its k low-D nearest
+#                 neighbours (1 = perfect local preservation).  The HD kNN graph
+#                 is also the t-SNE family's optimisation target, so NO is
+#                 "home-field" for t-SNE — read it for the γ-family story, not as
+#                 a neutral cross-family local score.
+#     * Trust@k — Trustworthiness: penalises low-D neighbours that are actually
+#                 far in high-D.  Objective-independent → a fair local metric.
+#
+#   scalars (results.csv → grouped bars)
+#     * knn_acc_10      — label kNN purity        (fair, supervised local)
+#     * global_spearman — Spearman ρ of HD vs LD pairwise distances (global)
+#     * triplet_acc     — random-triplet distance-ordering accuracy (fair global)
 
 def _knn_indices(X, k, n_jobs=-1):
-    """k-NN indices excluding self, shape (n, k)."""
+    """k nearest-neighbour indices (self excluded), shape (n, k)."""
     nn = NearestNeighbors(n_neighbors=k + 1, metric="euclidean", n_jobs=n_jobs)
     nn.fit(X)
     return nn.kneighbors(X, return_distance=False)[:, 1:]
 
 
-def _nh_curve_from_nbrs(hd_nbrs, ld_nbrs, k_values):
-    """Neighborhood Overlap NH@k for each k: |HD_k ∩ LD_k| / k, averaged."""
-    n = len(hd_nbrs)
-    return np.array([
-        np.mean([len(set(hd_nbrs[i, :k]) & set(ld_nbrs[i, :k])) / k
-                 for i in range(n)])
-        for k in k_values
-    ])
+def neighborhood_overlap_curve(hd_nbrs, ld_nbrs, K):
+    """NO@k for k=1..K: mean over points of |HD_k ∩ LD_k| / k.
+
+    Computed for the whole curve at once: a common element hd[j]=ld[r] lies in
+    both top-k sets for every k > max(j, r), so each contributes a suffix to the
+    cumulative-intersection count, summed over points then divided by k·n.
+    """
+    n = hd_nbrs.shape[0]
+    diff = np.zeros(K + 1)              # suffix-difference accumulator over k-idx
+    kidx = np.arange(K)
+    for i in range(n):
+        hd = hd_nbrs[i, :K]
+        ld = ld_nbrs[i, :K]
+        order = np.argsort(ld, kind="stable")
+        sorted_ld = ld[order]
+        pos = np.searchsorted(sorted_ld, hd)
+        ranks = np.full(K, K, dtype=np.int64)
+        ok = pos < K
+        hit = np.zeros(K, dtype=bool)
+        hit[ok] = sorted_ld[pos[ok]] == hd[ok]
+        ranks[hit] = order[pos[hit]]
+        thr = np.maximum(kidx, ranks)  # element enters both sets at this k-index
+        thr = thr[thr < K]
+        np.add.at(diff, thr, 1.0)
+    counts = np.cumsum(diff[:K])
+    return counts / (np.arange(1, K + 1) * n)
 
 
-def _nh_auc(nh_curve, k_values, k_lo, k_hi):
-    mask = (k_values >= k_lo) & (k_values <= k_hi)
-    if not mask.any():
-        return float("nan")
-    return float(nh_curve[mask].mean())
+def hd_rank_matrix(X_sub):
+    """rank[i, j] = position of j in the HD distance ordering from i (self = 0).
+
+    O(m²); computed once on a fixed subsample and reused by every embedding's
+    trustworthiness curve.
+    """
+    d = pairwise_distances(X_sub, metric="euclidean")
+    order = np.argsort(d, axis=1, kind="stable")
+    m = d.shape[0]
+    rank = np.empty((m, m), dtype=np.int32)
+    rank[np.arange(m)[:, None], order] = np.arange(m)[None, :]
+    return rank
 
 
-def _global_spearman(X, Y, random_state=42, n_sample=5000):
+def trustworthiness_curve(hd_rank, Y_sub, K, n_jobs=-1):
+    """Trust@k for k=1..K on a subsample (sklearn's definition, vectorised)."""
+    m = hd_rank.shape[0]
+    ld_order = _knn_indices(Y_sub, k=K, n_jobs=n_jobs)        # (m, K) LD nbrs
+    hr = np.take_along_axis(hd_rank, ld_order, axis=1)        # their HD ranks
+    T = np.full(K, np.nan)
+    for k in range(1, K + 1):
+        denom = m * k * (2 * m - 3 * k - 1)
+        if denom <= 0:
+            break                                            # k too large for m
+        pen = np.maximum(hr[:, :k] - k, 0).sum()
+        T[k - 1] = 1.0 - (2.0 / denom) * pen
+    return T
+
+
+def label_knn_accuracy(ld_nbrs, y, k):
+    """Mean fraction of each point's k LD-neighbours sharing its true label.
+
+    Reference is the ground-truth labels, NOT any method's HD kNN graph, so it
+    is fair across method families (unlike NO).
+    """
+    y = np.asarray(y)
+    nb = ld_nbrs[:, :k]
+    return float(np.mean((y[nb] == y[:, None]).mean(axis=1)))
+
+
+def global_spearman(X, Y, random_state=42, n_sample=5000):
     """Spearman ρ between HD and LD pairwise distances (on a subsample)."""
     n = len(X)
     if n > n_sample:
@@ -119,16 +192,45 @@ def _global_spearman(X, Y, random_state=42, n_sample=5000):
     return float(rho)
 
 
-def evaluate(Y, X_eval, hd_nbrs, k_values, master_seed=42):
-    """Return dict of the three scale metrics for an embedding Y."""
-    ld_nbrs = _knn_indices(np.asarray(Y), k=int(k_values.max()))
-    nh = _nh_curve_from_nbrs(hd_nbrs, ld_nbrs, k_values)
-    return {
-        "local_auc_1_10":  _nh_auc(nh, k_values, 1, 10),
-        "mid_auc_11_90":   _nh_auc(nh, k_values, 11, 90),
-        "global_spearman": _global_spearman(X_eval, np.asarray(Y),
-                                            random_state=master_seed),
+def triplet_accuracy(X, Y, n_per_point=5, random_state=42):
+    """Fraction of random triplets whose HD distance ordering survives in LD.
+
+    For each anchor i we draw ``n_per_point`` random pairs (j, l) and check
+    whether sign(d(i,j) − d(i,l)) agrees between HD and LD.  Method-agnostic and
+    a standard global-structure score (used by TriMap / PaCMAP).
+    """
+    rng = np.random.default_rng(random_state)
+    n = len(X)
+    i = np.repeat(np.arange(n), n_per_point)
+    j = rng.integers(0, n, size=i.shape)
+    l = rng.integers(0, n, size=i.shape)
+    bad = (j == i) | (l == i) | (j == l)
+    j[bad] = (j[bad] + 1) % n
+    l[bad] = (l[bad] + 2) % n
+    dij_hd = np.linalg.norm(X[i] - X[j], axis=1)
+    dil_hd = np.linalg.norm(X[i] - X[l], axis=1)
+    dij_ld = np.linalg.norm(Y[i] - Y[j], axis=1)
+    dil_ld = np.linalg.norm(Y[i] - Y[l], axis=1)
+    return float(np.mean((dij_hd < dil_hd) == (dij_ld < dil_ld)))
+
+
+def evaluate(Y, X_eval, hd_nbrs, K, trust_sub, hd_rank, y=None,
+             master_seed=42, n_per_point=5, n_jobs=-1):
+    """Return ({scalar metrics}, {curve arrays}) for an embedding Y."""
+    Y = np.asarray(Y)
+    ld_nbrs = _knn_indices(Y, k=K, n_jobs=n_jobs)
+    curves = {
+        "no":    neighborhood_overlap_curve(hd_nbrs, ld_nbrs, K),
+        "trust": trustworthiness_curve(hd_rank, Y[trust_sub], K, n_jobs=n_jobs),
     }
+    scalars = {
+        "knn_acc_10": (label_knn_accuracy(ld_nbrs, y, 10)
+                       if y is not None else np.nan),
+        "global_spearman": global_spearman(X_eval, Y, random_state=master_seed),
+        "triplet_acc": triplet_accuracy(X_eval, Y, n_per_point=n_per_point,
+                                        random_state=master_seed),
+    }
+    return scalars, curves
 
 
 # =============================================================================
@@ -273,8 +375,8 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
     return models
 
 
-def make_external_models(methods="all", ae_epochs=150):
-    """External DR baselines (pacmap / umap / trimap / autoencoder).
+def make_external_models(methods="all", vae_epochs=150):
+    """External DR baselines (pacmap / umap / trimap / vae).
 
     ``methods`` is "all" or a comma-separated subset. Only methods whose
     library is installed are returned, so the run degrades gracefully.
@@ -286,12 +388,12 @@ def make_external_models(methods="all", ae_epochs=150):
 
     models = {}
     for name, fn in avail.items():
-        if name == "autoencoder":
+        if name == "vae":
             # bind epochs without leaking the loop variable
-            def _ae(X, random_state, n_jobs=-1, _fn=fn, _ep=ae_epochs):
+            def _vae(X, random_state, n_jobs=-1, _fn=fn, _ep=vae_epochs):
                 return _fn(X, random_state=random_state, epochs=_ep,
                            n_jobs=n_jobs)
-            models[name] = {"kind": "external", "group": "external", "fn": _ae}
+            models[name] = {"kind": "external", "group": "external", "fn": _vae}
         else:
             models[name] = {"kind": "external", "group": "external", "fn": fn}
     return models
@@ -326,15 +428,15 @@ def load_dataset(name, n_samples, random_state, args):
 
 def run_all(args, out_dir):
     csv_path = os.path.join(out_dir, "results.csv")
+    curve_path = os.path.join(out_dir, "curves.csv")
     rng_seeds = np.random.default_rng(args.master_seed).integers(
         0, 2**31, size=args.n_seeds)
     seeds = [int(s) for s in rng_seeds]
 
-    k_values = np.arange(1, 91)
     models = make_models(args.total_iter, args.ee_iter, args.ee,
                          args.gamma_smooth, args.gamma_sharp)
     if not args.no_external:
-        ext = make_external_models(args.methods, ae_epochs=args.ae_epochs)
+        ext = make_external_models(args.methods, vae_epochs=args.vae_epochs)
         models.update(ext)
         print(f"  external baselines: {list(ext)}")
     print(f"Models ({len(models)}): {list(models)}")
@@ -342,18 +444,32 @@ def run_all(args, out_dir):
     print(f"\nLoading {args.dataset} (n_samples={args.n_samples}) ...")
     X_pca, y = load_dataset(args.dataset, args.n_samples, args.master_seed, args)
     X_eval = X_pca
+    n = len(X_eval)
     print(f"  data shape = {X_pca.shape}")
 
-    print(f"Pre-computing evaluation HD-kNN (k={k_values.max()}) ...")
-    hd_nbrs = _knn_indices(X_eval, k=int(k_values.max()))
+    # neighbourhood-size axis for the curves (clamp to n-2 so k is valid)
+    K = int(min(args.k_max, n - 2))
+    print(f"Pre-computing evaluation HD-kNN (k={K}) ...")
+    hd_nbrs = _knn_indices(X_eval, K, n_jobs=args.n_jobs)
+
+    # fixed subsample + HD rank matrix for the O(m^2) trustworthiness curve
+    m = int(min(args.trust_subsample, n))
+    trust_sub = (np.sort(np.random.default_rng(args.master_seed).choice(
+        n, size=m, replace=False)) if m < n else np.arange(n))
+    print(f"Pre-computing HD rank matrix for trustworthiness (m={m}) ...")
+    hd_rank = hd_rank_matrix(X_eval[trust_sub])
 
     existing = (pd.read_csv(csv_path)
                 if (os.path.exists(csv_path) and not args.fresh)
                 else pd.DataFrame())
+    existing_curves = (pd.read_csv(curve_path)
+                       if (os.path.exists(curve_path) and not args.fresh)
+                       else pd.DataFrame())
     done = (set(zip(existing["model"], existing["seed"]))
             if not existing.empty else set())
+    i10 = min(9, K - 1)  # index of NO@10 / trust@10 for the progress line
 
-    rows = []
+    rows, crows = [], []
     for seed in seeds:
         print(f"\n=== seed {seed} ===")
         # kNN graph is γ-independent and seed-independent for the data, but the
@@ -381,223 +497,347 @@ def run_all(args, out_dir):
                 Y = run_curriculum(spec["stages"], init.copy(),
                                    knn_idx, knn_dist, eff_perp,
                                    n_jobs=args.n_jobs, random_state=seed)
-            m = evaluate(Y, X_eval, hd_nbrs, k_values,
-                         master_seed=args.master_seed)
+            scal, curves = evaluate(
+                Y, X_eval, hd_nbrs, K, trust_sub, hd_rank, y=y,
+                master_seed=args.master_seed,
+                n_per_point=args.triplet_per_point, n_jobs=args.n_jobs)
             dt = time.time() - t0
-            row = {"model": name, "group": spec["group"], "seed": seed,
-                   "time_s": round(dt, 1), **m}
-            rows.append(row)
-            print(f"  {name:42s} local={m['local_auc_1_10']:.4f}  "
-                  f"mid={m['mid_auc_11_90']:.4f}  "
-                  f"global={m['global_spearman']:.4f}  ({dt:.1f}s)")
+            rows.append({"model": name, "group": spec["group"], "seed": seed,
+                         "time_s": round(dt, 1), **scal})
+            crows.append(pd.DataFrame({
+                "model": name, "group": spec["group"], "seed": seed,
+                "k": np.arange(1, K + 1),
+                "no": curves["no"], "trust": curves["trust"]}))
+            print(f"  {name:42s} NO@10={curves['no'][i10]:.3f}  "
+                  f"trust@10={curves['trust'][i10]:.3f}  "
+                  f"knn={scal['knn_acc_10']:.3f}  "
+                  f"ρ={scal['global_spearman']:.3f}  "
+                  f"trip={scal['triplet_acc']:.3f}  ({dt:.1f}s)")
 
             # checkpoint after every (model, seed)
-            cur = pd.concat([existing, pd.DataFrame(rows)], ignore_index=True)
-            cur.to_csv(csv_path, index=False)
+            pd.concat([existing, pd.DataFrame(rows)], ignore_index=True
+                      ).to_csv(csv_path, index=False)
+            pd.concat([existing_curves] + crows, ignore_index=True
+                      ).to_csv(curve_path, index=False)
 
     final = pd.concat([existing, pd.DataFrame(rows)], ignore_index=True) \
         if rows else existing
     final.to_csv(csv_path, index=False)
-    print(f"\nResults → {csv_path}")
-    return final
+    final_c = pd.concat([existing_curves] + crows, ignore_index=True) \
+        if crows else existing_curves
+    final_c.to_csv(curve_path, index=False)
+    print(f"\nResults → {csv_path}\nCurves  → {curve_path}")
+    return final, final_c
 
 
 # =============================================================================
 # Analysis, plots, verdict
 # =============================================================================
 
-METRICS = [
-    ("local_auc_1_10",  "Local (NH AUC k=1–10)",  True),
-    ("mid_auc_11_90",   "Mid (NH AUC k=11–90)",   True),
-    ("global_spearman", "Global (Spearman ρ)",    True),
-]
+# colour-blind-safe qualitative palette (Paul Tol 'muted' + a few extensions),
+# one colour per model; group is additionally encoded by marker + line style so
+# the figures stay legible in greyscale and to all colour-vision types.
+_PALETTE = ["#332288", "#88CCEE", "#44AA99", "#117733", "#999933",
+            "#DDCC77", "#CC6677", "#882255", "#AA4499", "#661100",
+            "#6699CC", "#000000"]
+# marker + line style per group (used by exp.py's 3 groups and by the schedule
+# families that tune_curriculum.py adds); .get(..) fallbacks keep it open-ended.
+_GROUP_LS = {"baseline": (0, (5, 2)), "curriculum": "solid",
+             "external": (0, (1, 1.2)),
+             "reference": (0, (5, 2)), "ramp": "solid",
+             "duration": (0, (3, 1, 1, 1)), "fine": (0, (1, 1.2))}
+_GROUP_MARKER = {"baseline": "s", "curriculum": "o", "external": "^",
+                 "reference": "s", "ramp": "o", "duration": "D", "fine": "."}
+_GROUP_ORDER = {"baseline": 0, "curriculum": 1, "external": 2,
+                "reference": 0, "ramp": 1, "duration": 2, "fine": 3}
 
 
-def summarize(df):
-    g = df.groupby(["model", "group"], as_index=False).agg(
-        local_mean=("local_auc_1_10", "mean"),
-        local_std=("local_auc_1_10", "std"),
-        mid_mean=("mid_auc_11_90", "mean"),
-        mid_std=("mid_auc_11_90", "std"),
-        global_mean=("global_spearman", "mean"),
-        global_std=("global_spearman", "std"),
+def _pretty(name):
+    return name.replace("baseline_", "").replace("curric_", "")
+
+
+def _groups_present(df):
+    """Unique groups in df, ordered by _GROUP_ORDER (unknown groups last)."""
+    return sorted(df["group"].unique().tolist(),
+                  key=lambda g: _GROUP_ORDER.get(g, 99))
+
+
+def _model_order(df):
+    info = df[["model", "group"]].drop_duplicates().copy()
+    info["go"] = info["group"].map(_GROUP_ORDER).fillna(9)
+    return info.sort_values(["go", "model"])["model"].tolist()
+
+
+def summarize_scalars(df):
+    return df.groupby(["model", "group"], as_index=False).agg(
+        knn_acc_mean=("knn_acc_10", "mean"), knn_acc_std=("knn_acc_10", "std"),
+        spearman_mean=("global_spearman", "mean"),
+        spearman_std=("global_spearman", "std"),
+        triplet_mean=("triplet_acc", "mean"), triplet_std=("triplet_acc", "std"),
         n=("seed", "nunique"),
     ).fillna(0.0)
-    return g
 
 
-_GROUP_COLOR = {"baseline": "#888888", "curriculum": "#0072B2",
-                "external": "#E69F00"}
-_GROUP_MARKER = {"baseline": "s", "curriculum": "o", "external": "^"}
+def summarize_curves(cdf):
+    return cdf.groupby(["model", "group", "k"], as_index=False).agg(
+        no_mean=("no", "mean"), no_std=("no", "std"),
+        trust_mean=("trust", "mean"), trust_std=("trust", "std"),
+    ).fillna(0.0)
 
 
-def make_plots(df, summary, out_dir, dataset):
-    # 1) grouped bar chart of the three metrics per model
-    fig, axes = plt.subplots(1, 3, figsize=(18, 7))
-    order = (summary.sort_values("group")["model"].tolist())
-    s = summary.set_index("model").reindex(order)
-    colors = [_GROUP_COLOR.get(g, "#0072B2") for g in s["group"]]
-    specs = [("local_mean", "local_std", "Local  NH AUC (k=1–10)"),
-             ("mid_mean", "mid_std", "Mid  NH AUC (k=11–90)"),
-             ("global_mean", "global_std", "Global  Spearman ρ")]
-    for ax, (mcol, scol, title) in zip(axes, specs):
-        ax.barh(range(len(s)), s[mcol].values, xerr=s[scol].values,
-                color=colors, edgecolor="black", linewidth=0.4)
-        ax.set_yticks(range(len(s)))
-        ax.set_yticklabels(s.index, fontsize=8)
-        ax.invert_yaxis()
-        ax.set_title(title)
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-    fig.suptitle(f"Curriculum-γ t-SNE vs baselines — {dataset}  "
-                 f"(grey=fixed-γ, blue=curriculum, orange=external DR)",
-                 fontsize=14)
-    plt.tight_layout()
-    p1 = os.path.join(out_dir, f"{dataset}_metrics_bars.png")
-    plt.savefig(p1, dpi=150, bbox_inches="tight")
-    plt.close()
+def _auc(curve_sum, value, model, k_lo, k_hi):
+    sub = curve_sum[(curve_sum["model"] == model) &
+                    (curve_sum["k"] >= k_lo) & (curve_sum["k"] <= k_hi)]
+    return float(sub[value].mean()) if len(sub) else float("nan")
 
-    # 2) trade-off scatter: local vs global, sized by mid
-    fig, ax = plt.subplots(figsize=(9, 7.5))
-    for _, r in summary.iterrows():
-        g = r["group"]
-        ax.scatter(r["local_mean"], r["global_mean"],
-                   s=150, c=_GROUP_COLOR.get(g, "#0072B2"),
-                   marker=_GROUP_MARKER.get(g, "o"),
-                   edgecolors="black", zorder=3)
-        ax.annotate(r["model"].replace("baseline_", "").replace("curric_", ""),
-                    (r["local_mean"], r["global_mean"]),
-                    fontsize=7, xytext=(4, 4), textcoords="offset points")
-    handles = [plt.Line2D([0], [0], marker=_GROUP_MARKER[g], color="w",
-                          markerfacecolor=_GROUP_COLOR[g], markersize=11,
-                          markeredgecolor="black", label=g)
-               for g in ("baseline", "curriculum", "external")
-               if (summary["group"] == g).any()]
-    ax.legend(handles=handles, frameon=False, loc="best")
-    ax.set_xlabel("Local  NH AUC (k=1–10)   →  better")
-    ax.set_ylabel("Global  Spearman ρ   →  better")
-    ax.set_title(f"Local–Global trade-off — {dataset}\n"
-                 "top-right = escapes the trade-off (good local AND global)")
+
+def _plot_curve(curve_sum, value, std, ylabel, title, note, out_path):
+    """One line per model, mean over seeds with a faint ±1 SD band."""
+    models = _model_order(curve_sum)
+    cmap = {m: _PALETTE[i % len(_PALETTE)] for i, m in enumerate(models)}
+    K = int(curve_sum["k"].max())
+    fig, ax = plt.subplots(figsize=(11.5, 7.0))
+    for m in models:
+        sub = curve_sum[curve_sum["model"] == m].sort_values("k")
+        grp = sub["group"].iloc[0]
+        ax.fill_between(sub["k"], sub[value] - sub[std], sub[value] + sub[std],
+                        color=cmap[m], alpha=0.08, linewidth=0)
+        ax.plot(sub["k"], sub[value], color=cmap[m], linewidth=1.9,
+                linestyle=_GROUP_LS.get(grp, "solid"),
+                marker=_GROUP_MARKER.get(grp, "o"),
+                markevery=max(1, K // 12), markersize=5,
+                markeredgecolor="white", markeredgewidth=0.4,
+                label=_pretty(m))
+    ax.set_xlim(0, K)
+    ax.set_xlabel("neighbourhood size  k", fontsize=12)
+    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_title(title, fontsize=13, fontweight="bold", pad=12)
+    ax.grid(True, alpha=0.25, linewidth=0.6)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    plt.tight_layout()
-    p2 = os.path.join(out_dir, f"{dataset}_tradeoff_scatter.png")
-    plt.savefig(p2, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"Plots → {p1}\n        {p2}")
+    ax.text(0.99, 0.02, note, transform=ax.transAxes, ha="right", va="bottom",
+            fontsize=9, style="italic", color="#555555")
+    # reserve right margin for the per-model legend so it is never clipped
+    fig.subplots_adjust(left=0.07, right=0.74, top=0.92, bottom=0.10)
+    leg = ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5),
+                    frameon=False, fontsize=9, title="model", handlelength=2.8)
+    leg.get_title().set_fontweight("bold")
+    ax.add_artist(leg)
+    # group-encoding key (marker + line style) inside the axes
+    handles = [plt.Line2D([0], [0], color="#444444",
+                          linestyle=_GROUP_LS.get(g, "solid"),
+                          marker=_GROUP_MARKER.get(g, "o"),
+                          markersize=6, label=g)
+               for g in _groups_present(curve_sum)]
+    key = ax.legend(handles=handles, loc="lower left", frameon=False,
+                    fontsize=9, title="family", handlelength=2.8)
+    key.get_title().set_fontweight("bold")
+    fig.savefig(out_path, dpi=200)
+    plt.close(fig)
 
 
-def verdict(summary, out_dir, dataset):
-    """Decide whether the curriculum idea works and write a markdown report."""
-    base = summary[summary["group"] == "baseline"].set_index("model")
-    curr = summary[summary["group"] == "curriculum"]
+def _plot_scalars(scal_sum, out_path, dataset):
+    """Grouped horizontal bars for the three fair scalar metrics."""
+    models = _model_order(scal_sum)
+    cmap = {m: _PALETTE[i % len(_PALETTE)] for i, m in enumerate(models)}
+    s = scal_sum.set_index("model").reindex(models)
+    colors = [cmap[m] for m in models]
+    panels = [
+        ("knn_acc_mean", "knn_acc_std",
+         "kNN label accuracy @10\n(fair local — higher better)"),
+        ("spearman_mean", "spearman_std",
+         "Global Spearman ρ\n(distance ranks — higher better)"),
+        ("triplet_mean", "triplet_std",
+         "Random-triplet accuracy\n(global ordering — higher better)"),
+    ]
+    fig, axes = plt.subplots(1, 3, figsize=(16, 7), sharey=True)
+    ypos = np.arange(len(models))
+    for ax, (mcol, scol, title) in zip(axes, panels):
+        ax.barh(ypos, s[mcol].values, xerr=s[scol].values,
+                color=colors, edgecolor="black", linewidth=0.4,
+                error_kw=dict(ecolor="#444444", lw=0.8))
+        ax.set_yticks(ypos)
+        ax.set_yticklabels([_pretty(m) for m in models], fontsize=9)
+        ax.invert_yaxis()
+        ax.set_title(title, fontsize=11)
+        ax.grid(True, axis="x", alpha=0.25)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        xmax = float(np.nanmax(s[mcol].values)) if len(s) else 1.0
+        for yi, v in zip(ypos, s[mcol].values):
+            ax.text(v + 0.01 * xmax, yi, f"{v:.3f}", va="center", fontsize=8)
+    fig.suptitle(f"Fair cross-method scalar metrics — {dataset}",
+                 fontsize=14, fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _plot_tradeoff(scal_sum, curve_sum, out_path, dataset):
+    """Local–global trade-off scatter: NO@1-10 (x) vs Spearman ρ (y)."""
+    models = _model_order(scal_sum)
+    cmap = {m: _PALETTE[i % len(_PALETTE)] for i, m in enumerate(models)}
+    s = scal_sum.set_index("model")
+    fig, ax = plt.subplots(figsize=(9.5, 7.5))
+    for m in models:
+        x = _auc(curve_sum, "no_mean", m, 1, 10)
+        y = s.loc[m, "spearman_mean"]
+        grp = s.loc[m, "group"]
+        ax.scatter(x, y, s=170, c=cmap[m], marker=_GROUP_MARKER.get(grp, "o"),
+                   edgecolors="black", linewidth=0.6, zorder=3)
+        ax.annotate(_pretty(m), (x, y), fontsize=8, xytext=(5, 4),
+                    textcoords="offset points")
+    handles = [plt.Line2D([0], [0], marker=_GROUP_MARKER.get(g, "o"), color="w",
+                          markerfacecolor="#888888", markersize=11,
+                          markeredgecolor="black", label=g)
+               for g in _groups_present(scal_sum)]
+    ax.legend(handles=handles, frameon=False, loc="best", title="family")
+    ax.set_xlabel("Local — Neighbourhood Overlap NO@1–10  →  better", fontsize=12)
+    ax.set_ylabel("Global — Spearman ρ  →  better", fontsize=12)
+    ax.set_title(f"Local–global trade-off — {dataset}\n"
+                 "top-right escapes the trade-off (good local AND global)",
+                 fontsize=12, fontweight="bold")
+    ax.grid(True, alpha=0.25)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def make_plots(scal_sum, curve_sum, out_dir, dataset):
+    p_no = os.path.join(out_dir, f"{dataset}_NO_curve.png")
+    p_tr = os.path.join(out_dir, f"{dataset}_trustworthiness_curve.png")
+    p_sc = os.path.join(out_dir, f"{dataset}_scalar_metrics.png")
+    p_td = os.path.join(out_dir, f"{dataset}_tradeoff_scatter.png")
+    _plot_curve(
+        curve_sum, "no_mean", "no_std",
+        "Neighbourhood Overlap   NO@k",
+        f"Neighbourhood Overlap vs k — {dataset}",
+        "higher = more of the true k-NN preserved   •   shaded = ±1 SD over seeds",
+        p_no)
+    _plot_curve(
+        curve_sum, "trust_mean", "trust_std",
+        "Trustworthiness   T@k",
+        f"Trustworthiness vs k — {dataset}",
+        "higher = fewer false neighbours intruding   •   shaded = ±1 SD over seeds",
+        p_tr)
+    _plot_scalars(scal_sum, p_sc, dataset)
+    _plot_tradeoff(scal_sum, curve_sum, p_td, dataset)
+    print(f"Plots → {p_no}\n        {p_tr}\n        {p_sc}\n        {p_td}")
+
+
+def verdict(scal_sum, curve_sum, out_dir, dataset):
+    """Decide whether the curriculum idea works and write a markdown report.
+
+    The within-family local story uses NO@1-10 (t-SNE home-field, valid only
+    among the γ models); the cross-method comparison uses ONLY the fair,
+    method-agnostic metrics (trust@10, knn@10, spearman, triplet).
+    """
+    s = scal_sum.set_index("model")
+    no10 = {m: _auc(curve_sum, "no_mean", m, 1, 10) for m in s.index}
+    tr10 = {m: _auc(curve_sum, "trust_mean", m, 10, 10) for m in s.index}
+    tbl = pd.DataFrame({
+        "NO@1-10":  pd.Series(no10),
+        "trust@10": pd.Series(tr10),
+        "knn@10":   s["knn_acc_mean"],
+        "spearman": s["spearman_mean"],
+        "triplet":  s["triplet_mean"],
+        "group":    s["group"],
+    })
+    cols = ["NO@1-10", "trust@10", "knn@10", "spearman", "triplet"]
+    base = tbl[tbl["group"] == "baseline"]
+    curr = tbl[tbl["group"] == "curriculum"].copy()
+    ext = tbl[tbl["group"] == "external"]
+
+    lines = [f"# Curriculum-γ t-SNE — verdict ({dataset})\n"]
+    lines.append(
+        "Metrics: **NO@1-10** = local neighbour overlap (t-SNE-family "
+        "home-field — comparable *only* within the γ models); **trust@10 / "
+        "knn@10** = fair local quality; **spearman / triplet** = fair global "
+        "structure.\n")
+    lines.append("## Baselines\n")
+    lines.append(base[cols].round(4).to_string())
+    lines.append("\n## Curriculum models\n")
+    lines.append(curr[cols].round(4).to_string())
 
     std = base.loc["baseline_standard"]
-    # best baseline value per metric (the specialist each scale is best at)
-    best_local_base = base["local_mean"].max()
-    best_mid_base = base["mid_mean"].max()
-    best_global_base = base["global_mean"].max()
+    best_local = base["NO@1-10"].max()
+    best_global = base["spearman"].max()
 
-    lines = []
-    lines.append(f"# Curriculum-γ t-SNE — verdict ({dataset})\n")
-    lines.append("## Baselines\n")
-    lines.append(base[["local_mean", "mid_mean", "global_mean"]]
-                 .round(4).to_string())
-    lines.append("\n## Curriculum models\n")
-    lines.append(curr.set_index("model")[["local_mean", "mid_mean",
-                 "global_mean"]].round(4).to_string())
+    def cap(val, lo, hi):
+        if hi - lo <= 1e-9:
+            return 1.0
+        return (val - lo) / (hi - lo)
 
-    # Criterion A: does any curriculum DOMINATE standard t-SNE on all 3 metrics?
-    dom = curr[(curr["local_mean"] >= std["local_mean"]) &
-               (curr["mid_mean"] >= std["mid_mean"]) &
-               (curr["global_mean"] >= std["global_mean"])]
-
-    # Criterion B: does any curriculum capture most of BOTH specialists' edge,
-    # i.e. local close to the sharp specialist AND global close to the smooth
-    # specialist — escaping the trade-off rather than landing in the middle?
-    def frac_of_best(val, std_val, best_val):
-        # fraction of the baseline's available headroom (std→best) captured
-        if best_val - std_val <= 1e-9:
-            return 1.0  # no headroom to capture
-        return (val - std_val) / (best_val - std_val)
-
-    curr = curr.copy()
-    curr["local_capture"] = curr["local_mean"].apply(
-        lambda v: frac_of_best(v, std["local_mean"], best_local_base))
-    curr["global_capture"] = curr["global_mean"].apply(
-        lambda v: frac_of_best(v, std["global_mean"], best_global_base))
-    # combined: must capture a healthy share of both ends simultaneously
+    curr["local_capture"] = curr["NO@1-10"].apply(
+        lambda v: cap(v, std["NO@1-10"], best_local))
+    curr["global_capture"] = curr["spearman"].apply(
+        lambda v: cap(v, std["spearman"], best_global))
     curr["min_capture"] = curr[["local_capture", "global_capture"]].min(axis=1)
+    bc = curr.sort_values("min_capture", ascending=False).iloc[0]
 
-    best_combo = curr.sort_values("min_capture", ascending=False).iloc[0]
+    lines.append("\n## Headroom capture "
+                 "(local=NO@1-10, global=spearman; vs standard, "
+                 "normalised to best baseline)\n")
+    lines.append(curr[["local_capture", "global_capture", "min_capture"]]
+                 .round(3).to_string())
 
-    lines.append("\n## Headroom capture (vs standard, normalized to best baseline)\n")
-    lines.append(curr.set_index("model")[
-        ["local_capture", "global_capture", "min_capture"]].round(3).to_string())
+    dom = curr[(curr["NO@1-10"] >= std["NO@1-10"]) &
+               (curr["trust@10"] >= std["trust@10"]) &
+               (curr["spearman"] >= std["spearman"])]
 
     lines.append("\n## Verdict\n")
     works = False
     if not dom.empty:
-        winner = dom.sort_values("min_capture", ascending=False).iloc[0] \
-            if "min_capture" in dom else dom.iloc[0]
-        lines.append(
-            f"- **{len(dom)} curriculum config(s) DOMINATE standard t-SNE** "
-            f"(≥ on local, mid, and global simultaneously).")
+        lines.append(f"- **{len(dom)} curriculum config(s)** beat standard "
+                     "t-SNE on local (NO), trust@10 AND global (spearman) "
+                     "simultaneously.")
         works = True
     else:
-        lines.append("- No curriculum config dominates standard t-SNE on all "
-                     "three metrics at once.")
-
-    bc = best_combo
+        lines.append("- No curriculum config beats standard t-SNE on local, "
+                     "trust and global at once.")
     lines.append(
-        f"- Best trade-off config: **{bc['model']}** — captures "
+        f"- Best trade-off config: **{bc.name}** — captures "
         f"{bc['local_capture']*100:.0f}% of the local headroom and "
         f"{bc['global_capture']*100:.0f}% of the global headroom that the "
         f"specialist baselines offer.")
-
-    # "works" (escapes trade-off) if it grabs a meaningful share of BOTH ends
-    if bc["min_capture"] >= 0.5 and bc["local_capture"] > 0 and bc["global_capture"] > 0:
+    if bc["min_capture"] >= 0.5 and bc["local_capture"] > 0 \
+            and bc["global_capture"] > 0:
         lines.append(
-            "- **CONCLUSION: the curriculum idea WORKS.** A single 3-stage γ "
-            "schedule reaches most of the local quality of the sharp specialist "
-            "AND most of the global quality of the smooth specialist — escaping "
-            "the trade-off that any single fixed γ is stuck on.")
+            "- **CONCLUSION: the curriculum idea WORKS.** A single γ schedule "
+            "reaches most of the sharp specialist's local quality AND most of "
+            "the smooth specialist's global quality — escaping the trade-off "
+            "any single fixed γ is stuck on.")
         works = True
     elif works:
         lines.append(
-            "- **CONCLUSION: partial success.** A config beats standard t-SNE "
-            "on all metrics, but does not strongly capture both specialists' "
-            "headroom. Worth tuning further (γ values / stage iteration split).")
+            "- **CONCLUSION: partial success.** Beats standard t-SNE across "
+            "scales but does not strongly capture both specialists' headroom. "
+            "Worth tuning (γ values / stage split).")
     else:
         lines.append(
             "- **CONCLUSION: not convincing yet.** No config simultaneously "
-            "improves on standard t-SNE across scales. Try a wider sweep "
-            "(stronger sharp γ, smoother global γ, longer local stage), or "
-            "the trade-off may be fundamental for this data.")
+            "improves on standard across scales. Try a wider sweep (stronger "
+            "sharp γ, smoother global γ, longer local stage).")
 
-    # ── Comparison against external DR methods ───────────────────────────────
-    ext = summary[summary["group"] == "external"].set_index("model")
+    # ── Comparison against external DR methods (FAIR metrics only) ───────────
     if not ext.empty:
-        lines.append("\n## vs external DR methods\n")
-        lines.append(ext[["local_mean", "mid_mean", "global_mean"]]
-                     .round(4).to_string())
-        bc_local, bc_global = bc["local_mean"], bc["global_mean"]
+        lines.append("\n## vs external DR methods (FAIR metrics only)\n")
         lines.append(
-            f"\nBest curriculum (**{bc['model']}**): "
-            f"local={bc_local:.4f}, global={bc_global:.4f}.\n")
+            "NO@1-10 is *excluded* here — it scores preservation of the exact "
+            "Euclidean kNN graph that t-SNE optimises directly, so it is not a "
+            "neutral cross-family metric. trust@10 / knn@10 / spearman / "
+            "triplet are method-agnostic.\n")
+        fair = ["trust@10", "knn@10", "spearman", "triplet"]
+        lines.append(ext[fair].round(4).to_string())
+        lines.append("\nBest curriculum (**" + str(bc.name) + "**): " +
+                     ", ".join(f"{c}={bc[c]:.4f}" for c in fair) + ".\n")
         for mname, r in ext.iterrows():
-            wins = []
-            if bc_local >= r["local_mean"]:
-                wins.append("local")
-            if bc_global >= r["global_mean"]:
-                wins.append("global")
-            if r["mid_mean"] <= bc["mid_mean"]:
-                wins.append("mid")
-            verdict_txt = ("ties/beats on " + ", ".join(wins)) if wins \
-                else "loses on all scales"
-            lines.append(
-                f"- vs **{mname}** (local={r['local_mean']:.4f}, "
-                f"global={r['global_mean']:.4f}): curriculum {verdict_txt}.")
+            wins = [c for c in fair if bc[c] >= r[c]]
+            txt = ("ties/beats on " + ", ".join(wins)) if wins \
+                else "loses on all fair metrics"
+            lines.append(f"- vs **{mname}**: curriculum {txt}.")
 
     report = "\n".join(lines)
     path = os.path.join(out_dir, f"{dataset}_VERDICT.md")
@@ -628,6 +868,14 @@ def main():
     ap.add_argument("--master_seed", type=int, default=42)
     ap.add_argument("--n_jobs", type=int, default=-1)
 
+    # evaluation knobs
+    ap.add_argument("--k_max", type=int, default=200,
+                    help="max neighbourhood size k for the NO / trust curves")
+    ap.add_argument("--trust_subsample", type=int, default=4000,
+                    help="subsample size for the O(m^2) trustworthiness curve")
+    ap.add_argument("--triplet_per_point", type=int, default=5,
+                    help="random triplets sampled per anchor for triplet_acc")
+
     # γ schedule knobs
     ap.add_argument("--gamma_smooth", type=float, default=0.5)
     ap.add_argument("--gamma_sharp", type=float, default=2.0)
@@ -642,11 +890,11 @@ def main():
     # external DR baselines
     ap.add_argument("--methods", default="all",
                     help="external baselines: 'all' or comma-separated subset "
-                         "of pacmap,umap,trimap,autoencoder")
+                         "of pacmap,umap,trimap,vae")
     ap.add_argument("--no_external", action="store_true",
                     help="skip external baselines, run only γ models")
-    ap.add_argument("--ae_epochs", type=int, default=150,
-                    help="training epochs for the autoencoder baseline")
+    ap.add_argument("--vae_epochs", type=int, default=150,
+                    help="training epochs for the VAE baseline")
 
     ap.add_argument("--out_dir", default=None)
     ap.add_argument("--fresh", action="store_true",
@@ -662,6 +910,7 @@ def main():
         args.n_seeds = 1
         args.total_iter = 400
         args.ee_iter = 100
+        args.trust_subsample = min(args.trust_subsample, 1500)
 
     out_dir = args.out_dir or os.path.join(
         _SCRIPT_DIR, "results", f"{args.dataset}_curriculum")
@@ -669,16 +918,22 @@ def main():
 
     if args.plot_only:
         csv_path = os.path.join(out_dir, "results.csv")
-        if not os.path.exists(csv_path):
-            raise SystemExit(f"No results.csv at {csv_path}; run without --plot_only first.")
+        curve_path = os.path.join(out_dir, "curves.csv")
+        if not (os.path.exists(csv_path) and os.path.exists(curve_path)):
+            raise SystemExit(
+                f"Need both results.csv and curves.csv in {out_dir}; "
+                "run without --plot_only first.")
         df = pd.read_csv(csv_path)
+        cdf = pd.read_csv(curve_path)
     else:
-        df = run_all(args, out_dir)
+        df, cdf = run_all(args, out_dir)
 
-    summary = summarize(df)
-    summary.to_csv(os.path.join(out_dir, "summary.csv"), index=False)
-    make_plots(df, summary, out_dir, args.dataset)
-    verdict(summary, out_dir, args.dataset)
+    scal_sum = summarize_scalars(df)
+    curve_sum = summarize_curves(cdf)
+    scal_sum.to_csv(os.path.join(out_dir, "summary_scalars.csv"), index=False)
+    curve_sum.to_csv(os.path.join(out_dir, "summary_curves.csv"), index=False)
+    make_plots(scal_sum, curve_sum, out_dir, args.dataset)
+    verdict(scal_sum, curve_sum, out_dir, args.dataset)
 
 
 if __name__ == "__main__":
