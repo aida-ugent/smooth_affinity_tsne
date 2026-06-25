@@ -49,7 +49,8 @@ from sklearn.neighbors import NearestNeighbors
 # Each must return (X_pca, y, ...) consistent with load_data() below.
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_SCRIPT_DIR, "data"))
-from load_data import load_mouse_data, load_mnist_data, load_adult_data
+from load_data import (load_mouse_data, load_mnist_data, load_adult_data,
+                        load_coil20_data)
 
 
 # =============================================================================
@@ -792,6 +793,17 @@ def exp5_embedding_comparison(X_pca, y, out_dir,
         ]
         legend_title = "Digit"
 
+    elif dataset == "coil20":
+        palette      = plt.cm.tab20(np.linspace(0, 1, 20))
+        objs         = np.asarray(y).astype(int) - 1     # ids 1..20 -> 0..19
+        point_colors = palette[objs]
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markersize=8,
+                   markerfacecolor=palette[o], label=str(o + 1))
+            for o in range(20)
+        ]
+        legend_title = "Object"
+
     else:
         pal          = {0: "#4393C3", 1: "#D6604D"}
         point_colors = [pal[int(yi)] for yi in y]
@@ -1423,6 +1435,17 @@ def _dataset_point_colors(labels, dataset, cluster_colors_arr=None,
         ]
         return point_colors, legend_handles, "Income"
 
+    if dataset == "coil20":
+        palette = plt.cm.tab20(np.linspace(0, 1, 20))
+        objs    = np.asarray(labels).astype(int) - 1      # ids 1..20 -> 0..19
+        point_colors = color_hex if color_hex is not None else palette[objs]
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markersize=8,
+                   markerfacecolor=palette[o], label=str(o + 1))
+            for o in range(20)
+        ]
+        return point_colors, legend_handles, "Object"
+
     # mouse
     if color_hex is not None:
         point_colors = color_hex
@@ -1557,6 +1580,11 @@ def load_data(dataset, args):
         print("Loading Adult census data ...")
         X_pca, y = load_adult_data(max_rows=args.adult_max_rows,
                                     random_state=args.random_state)
+
+    elif dataset == "coil20":
+        print("Loading COIL-20 (PCA-50) ...")
+        X_pca, y, _ = load_coil20_data(n_pca=50,
+                                        random_state=args.random_state)
     else:
         raise ValueError(f"Unknown dataset: {dataset!r}")
 
@@ -1757,6 +1785,16 @@ def plot_all_from_csv(args):
                 for v in [0, 1]
             ]
             legend_title = "Income"
+        elif dataset == "coil20":
+            palette      = plt.cm.tab20(np.linspace(0, 1, 20))
+            objs         = np.array([int(v) for v in labels]) - 1
+            point_colors = palette[objs]
+            legend_handles = [
+                Line2D([0], [0], marker="o", color="w", markersize=8,
+                       markerfacecolor=palette[o], label=str(o + 1))
+                for o in range(20)
+            ]
+            legend_title = "Object"
         else:  # mouse
             # Prefer the per-point colour persisted in the CSV; fall back to
             # reloading the Tasic cluster colours and indexing by cluster id
@@ -2037,7 +2075,7 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--dataset",          required=True,
-                   choices=["mnist", "mouse", "adult"])
+                   choices=["mnist", "mouse", "adult", "coil20"])
     p.add_argument("--out_dir",          default=None)
     p.add_argument("--mouse_data_dir",   default=None)
     p.add_argument("--mouse_subsample",  type=int, default=None)

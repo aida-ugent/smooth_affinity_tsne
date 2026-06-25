@@ -126,6 +126,33 @@ def load_mnist_data(n_pca=50, random_state=42):
     return X_pca, y, X_raw
 
 
+def load_coil20_data(n_pca=50, random_state=42):
+    """
+    Load COIL-20 (1440 × 1024) from OpenML, normalise to [0, 1], reduce to
+    `n_pca` dims.
+
+    COIL-20 is 20 objects photographed at 72 rotations each (1440 images,
+    32×32 = 1024 grayscale pixels).  Each object forms a closed 1-D loop in
+    pixel space, which makes it a classic structure-preservation benchmark
+    for DR methods.
+
+    Returns
+    -------
+    X_pca : ndarray, shape (1440, n_pca)
+    y     : ndarray of int, shape (1440,)  – object id 1..20
+    X_raw : ndarray, shape (1440, 1024)    – pixel values / 255
+    """
+    ds = fetch_openml("COIL-20", version=1, as_frame=False)
+    X_raw = ds.data.astype(np.float64) / 255.0
+    y = ds.target.astype(int)
+
+    n_comp = min(n_pca, X_raw.shape[1], X_raw.shape[0])
+    pca = PCA(n_components=n_comp, random_state=random_state)
+    X_pca = pca.fit_transform(X_raw)
+
+    return X_pca, y, X_raw
+
+
 def load_adult_data(max_rows=10000, random_state=42):
     """
     Load and preprocess the Adult (census-income) dataset.
