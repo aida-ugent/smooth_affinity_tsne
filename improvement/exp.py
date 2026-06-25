@@ -372,6 +372,34 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
         ],
     }
 
+    # ── Winner of tune_curriculum.py: 3-stage γ=[smooth,1,sharp] with a
+    # FRONT-HEAVY 50/30/20 duration split (most time on the smooth global
+    # stage, least on the sharp local stage).  Unlike the sweep above — which
+    # fixes the global stage at exactly ee_iter — here the global stage gets
+    # 50% of the WHOLE budget, with early exaggeration as its first ee_iter
+    # iters (matching tune_curriculum.build_stages).  This is the recommended
+    # recipe; including it lets the multi-seed comparison reflect it.
+    n_glob = int(round(total_iter * 0.5))
+    n_mid_fh = int(round(total_iter * 0.3))
+    n_loc_fh = total_iter - n_glob - n_mid_fh
+    ee_c = min(ee_iter, n_glob)
+    fh_stages = [
+        {"gamma": gamma_smooth, "n_iter": ee_c,
+         "exaggeration": ee, "momentum": 0.5},            # GLOBAL + early exag
+    ]
+    if n_glob - ee_c > 0:
+        fh_stages.append({"gamma": gamma_smooth, "n_iter": n_glob - ee_c,
+                          "exaggeration": 1.0, "momentum": 0.8})  # GLOBAL plain
+    fh_stages += [
+        {"gamma": 1.0,         "n_iter": n_mid_fh,
+         "exaggeration": 1.0, "momentum": 0.8},           # MID
+        {"gamma": gamma_sharp, "n_iter": n_loc_fh,
+         "exaggeration": 1.0, "momentum": 0.8},           # LOCAL
+    ]
+    models[f"curric_glob{gamma_smooth:g}_sharp{gamma_sharp:g}_frontheavy"] = {
+        "kind": "curriculum", "group": "curriculum", "stages": fh_stages,
+    }
+
     return models
 
 

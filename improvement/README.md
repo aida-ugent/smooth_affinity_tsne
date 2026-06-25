@@ -115,8 +115,16 @@ Curriculum models:
 | glob0.5_sharp2_no_mid | 0.4993 | 0.9630 | 0.9125 | 0.4208 | 0.6504 |
 | glob0.5_sharp2_split5050 | 0.4960 | 0.9710 | 0.9190 | 0.4227 | 0.6482 |
 | glob0.5_sharp2_localheavy | 0.4968 | 0.9707 | 0.9188 | 0.4199 | 0.6475 |
+| **glob0.5_sharp2_frontheavy** (tuning winner) | 0.4844 | 0.9673 | 0.9098 | **0.4249** | 0.6488 |
 | glob1_sharp2_split5050 | 0.4960 | 0.9702 | 0.9186 | 0.3731 | 0.6339 |
 | glob1_sharp2_localheavy | 0.4970 | 0.9706 | 0.9184 | 0.3705 | 0.6327 |
+
+> **Front-heavy at scale (10k vs the search's 5k):** the tuning winner posts the
+> **best global of any curriculum** (spearman 0.4249) — its global advantage
+> transferred — but its 20% local stage under-sharpens at 10k, so NO@1-10 (0.4844)
+> dips just below standard (local_capture ≈ −0.06). At larger n the local stage
+> needs a bigger share; front-heavy is the **global champion**, `no_mid` the
+> **balanced champion**.
 
 **Headroom capture** (vs standard, normalised so 0 = standard, 1 = the best
 specialist baseline; local = NO@1-10, global = spearman):
@@ -148,6 +156,13 @@ at trust 0.9630 / knn 0.9125 / spearman 0.4208 / triplet 0.6504):
 
 The curriculum ties/beats **all four** on global (spearman + triplet) and on
 trust/knn vs all except UMAP's knn (essentially tied).
+
+The **front-heavy tuning winner** is the strongest curriculum on global and
+makes the cross-family gap starkest: spearman 0.4249 / triplet 0.6488 vs the
+best external ~0.33 / ~0.625, while staying competitive on the fair local
+metrics (trust 0.9673; knn 0.9098, just behind UMAP's 0.9135). So the
+schedule the search picked for *global* structure is exactly the one that most
+decisively beats PaCMAP/UMAP/TriMap/VAE on the global axis.
 
 ## 7. Schedule search — what's best and why
 
@@ -196,9 +211,12 @@ Three patterns from the search:
 
 ## 9. Open questions / next steps
 
-- [ ] Add the front-heavy schedule to `exp.py`'s model set and run it across
-      3 seeds — the search winner is **single-seed**; its global score (0.4475)
-      edges the multi-seed `no_mid` best (0.4208), so confirm it holds.
+- [x] Add the front-heavy schedule to `exp.py` and run 3 seeds. **Done.**
+      Its *global* advantage transferred (spearman 0.4249 — best of any
+      curriculum, and it beats every external method), but at 10k its short
+      20% local stage under-sharpens, so local dips below standard. Front-heavy
+      = global champion; `no_mid` = balanced champion. **Next:** try front-heavy
+      with a larger local share (e.g. 50/25/25) to see if it can be balanced too.
 - [ ] Replicate on **mouse** (Tasic scRNA-seq) and **adult** — does the
       50/30/20 recipe transfer, or is the split dataset-dependent?
 - [ ] The curriculum gives up a little **mid-scale / trust**; is that

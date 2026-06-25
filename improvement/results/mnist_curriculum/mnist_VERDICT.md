@@ -12,6 +12,7 @@ baseline_standard   0.4854    0.9795  0.9268    0.3739   0.6340
 ## Curriculum models
 
                                   NO@1-10  trust@10  knn@10  spearman  triplet
+curric_glob0.5_sharp2_frontheavy   0.4844    0.9673  0.9098    0.4249   0.6488
 curric_glob0.5_sharp2_localheavy   0.4968    0.9707  0.9188    0.4199   0.6475
 curric_glob0.5_sharp2_no_mid       0.4993    0.9630  0.9125    0.4208   0.6504
 curric_glob0.5_sharp2_split5050    0.4960    0.9710  0.9190    0.4227   0.6482
@@ -21,6 +22,7 @@ curric_glob1_sharp2_split5050      0.4960    0.9702  0.9186    0.3731   0.6339
 ## Headroom capture (local=NO@1-10, global=spearman; vs standard, normalised to best baseline)
 
                                   local_capture  global_capture  min_capture
+curric_glob0.5_sharp2_frontheavy         -0.061           0.895       -0.061
 curric_glob0.5_sharp2_localheavy          0.701           0.808        0.701
 curric_glob0.5_sharp2_no_mid              0.856           0.822        0.822
 curric_glob0.5_sharp2_split5050           0.649           0.857        0.649
