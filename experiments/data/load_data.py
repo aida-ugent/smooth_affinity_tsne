@@ -153,6 +153,76 @@ def load_coil20_data(n_pca=50, random_state=42):
     return X_pca, y, X_raw
 
 
+def load_fashion_mnist_data(n_pca=50, random_state=42):
+    """
+    Load Fashion-MNIST (70 000 × 784) from OpenML, normalise to [0, 1], reduce
+    to `n_pca` dims.  Same shape as MNIST but with overlapping/ambiguous classes
+    (e.g. shirt vs. coat vs. pullover), so it probes the fuzzy-cluster regime.
+
+    Returns
+    -------
+    X_pca : ndarray, shape (70000, n_pca)
+    y     : ndarray of str, shape (70000,)  – class id "0".."9"
+    X_raw : ndarray, shape (70000, 784)     – pixel values / 255
+    """
+    ds = fetch_openml("Fashion-MNIST", version=1, as_frame=False)
+    X_raw = ds.data.astype(np.float64) / 255.0
+    y = ds.target.astype(str)
+
+    pca = PCA(n_components=n_pca, random_state=random_state)
+    X_pca = pca.fit_transform(X_raw)
+
+    return X_pca, y, X_raw
+
+
+def load_swiss_roll_data(n_samples=8000, noise=0.05, n_bins=10, random_state=42):
+    """
+    Generate the Swiss-roll manifold: a 2-D sheet rolled into 3-D.
+
+    Unlike the clustered datasets this has *continuous* manifold structure with
+    a known intrinsic coordinate `t` (position along the roll), so it is the
+    canonical test of whether an embedding preserves *global* geometry (t-SNE
+    notoriously tears the roll).  `t` is binned into `n_bins` ordered bands for
+    a sequential colouring — a correct unrolling shows a clean colour gradient.
+
+    Returns
+    -------
+    X : ndarray, shape (n_samples, 3)        – ambient coordinates
+    y : ndarray of int, shape (n_samples,)   – ordered position band 0..n_bins-1
+    t : ndarray, shape (n_samples,)          – continuous manifold position
+    """
+    from sklearn.datasets import make_swiss_roll
+    X, t = make_swiss_roll(n_samples=n_samples, noise=noise,
+                           random_state=random_state)
+    X = X.astype(np.float64)
+    # Equal-frequency bands along the manifold position.
+    edges = np.quantile(t, np.linspace(0, 1, n_bins + 1)[1:-1])
+    y = np.digitize(t, edges).astype(int)
+    return X, y, t
+
+
+def load_pbmc3k_data(h5ad_path, n_pca=50):
+    """
+    Load the preprocessed PBMC 3k scRNA-seq dataset (human peripheral-blood
+    immune cells) from an AnnData .h5ad file.  A second single-cell dataset
+    (different organism/tissue than the mouse cortex) for within-modality
+    robustness checks.
+
+    Uses the precomputed `obsm["X_pca"]` (already the scanpy-standard
+    log-normalised + scaled PCA) and the `obs["louvain"]` cell-type labels.
+
+    Returns
+    -------
+    X_pca : ndarray, shape (n_cells, n_pca)
+    y     : ndarray of str, shape (n_cells,)  – cell-type name
+    """
+    import anndata as ad
+    a = ad.read_h5ad(h5ad_path)
+    X_pca = np.asarray(a.obsm["X_pca"])[:, :n_pca].astype(np.float64)
+    y = a.obs["louvain"].astype(str).to_numpy()
+    return X_pca, y
+
+
 def load_adult_data(max_rows=10000, random_state=42):
     """
     Load and preprocess the Adult (census-income) dataset.

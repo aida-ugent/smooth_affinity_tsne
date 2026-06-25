@@ -50,7 +50,8 @@ from sklearn.neighbors import NearestNeighbors
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_SCRIPT_DIR, "data"))
 from load_data import (load_mouse_data, load_mnist_data, load_adult_data,
-                        load_coil20_data)
+                        load_coil20_data, load_fashion_mnist_data,
+                        load_swiss_roll_data, load_pbmc3k_data)
 
 
 # =============================================================================
@@ -177,6 +178,12 @@ _EXP9_YLIM = {
     "adult": (0.38, 0.65),
 }
 _EXP9_YLIM_DEFAULT = (0.22, 0.45)
+
+# Fashion-MNIST class id -> garment name (for the embedding legends).
+_FASHION_CLASSES = [
+    "T-shirt/top", "Trouser", "Pullover", "Dress", "Coat",
+    "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot",
+]
 
 _plot_save_dir = [None]
 # Prefix prepended to every saved figure filename (e.g. "mouse_", "mnist_",
@@ -769,51 +776,8 @@ def exp5_embedding_comparison(X_pca, y, out_dir,
     Y_smo_arr = np.asarray(Y_smo)
 
     # ── Colour/legend logic ───────────────────────────────────────────────────
-    if dataset == "mouse" and cluster_colors_arr is not None:
-        point_colors = cluster_colors_arr[y]
-
-        def _get_major_class(name):
-            if name.startswith(("Lamp5", "Vip", "Pvalb", "Sst")):
-                return "Inhibitory"
-            if name.startswith(("L2/3", "L5", "L6")):
-                return "Excitatory"
-            return "Non-neuronal"
-
-        legend_handles = _mouse_major_legend_handles()
-        legend_title = "Cell type"
-
-    elif dataset == "mnist":
-        palette      = plt.cm.tab10(np.linspace(0, 0.9, 10))
-        digits       = np.array([int(d) for d in y])
-        point_colors = palette[digits]
-        legend_handles = [
-            Line2D([0], [0], marker="o", color="w", markersize=8,
-                   markerfacecolor=palette[d], label=str(d))
-            for d in range(10)
-        ]
-        legend_title = "Digit"
-
-    elif dataset == "coil20":
-        palette      = plt.cm.tab20(np.linspace(0, 1, 20))
-        objs         = np.asarray(y).astype(int) - 1     # ids 1..20 -> 0..19
-        point_colors = palette[objs]
-        legend_handles = [
-            Line2D([0], [0], marker="o", color="w", markersize=8,
-                   markerfacecolor=palette[o], label=str(o + 1))
-            for o in range(20)
-        ]
-        legend_title = "Object"
-
-    else:
-        pal          = {0: "#4393C3", 1: "#D6604D"}
-        point_colors = [pal[int(yi)] for yi in y]
-        legend_handles = [
-            Line2D([0], [0], marker="o", color="w", markersize=8,
-                   markerfacecolor=pal[v],
-                   label="Income ≤50K" if v == 0 else "Income >50K")
-            for v in [0, 1]
-        ]
-        legend_title = "Income"
+    point_colors, legend_handles, legend_title = _dataset_point_colors(
+        y, dataset, cluster_colors_arr=cluster_colors_arr)
 
     # ── Save embedding CSVs (for plot_only mode) ─────────────────────────────
     # Persist the per-point colour too, so --plot_only reproduces the exact
@@ -1446,6 +1410,42 @@ def _dataset_point_colors(labels, dataset, cluster_colors_arr=None,
         ]
         return point_colors, legend_handles, "Object"
 
+    if dataset == "fashion_mnist":
+        palette = plt.cm.tab10(np.linspace(0, 0.9, 10))
+        ids     = np.array([int(d) for d in labels])
+        point_colors = color_hex if color_hex is not None else palette[ids]
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markersize=8,
+                   markerfacecolor=palette[d], label=_FASHION_CLASSES[d])
+            for d in range(10)
+        ]
+        return point_colors, legend_handles, "Class"
+
+    if dataset == "swiss_roll":
+        # Sequential colour gradient along the manifold position bands.
+        palette = plt.cm.viridis(np.linspace(0, 1, 10))
+        bands   = np.array([int(b) for b in labels])
+        point_colors = color_hex if color_hex is not None else palette[bands]
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markersize=8,
+                   markerfacecolor=palette[b], label=str(b))
+            for b in range(10)
+        ]
+        return point_colors, legend_handles, "Position band"
+
+    if dataset == "pbmc3k":
+        cats    = sorted({str(l) for l in labels})
+        palette = plt.cm.tab10(np.linspace(0, 0.9, max(len(cats), 1)))
+        idx     = {c: i for i, c in enumerate(cats)}
+        point_colors = (color_hex if color_hex is not None
+                        else palette[[idx[str(l)] for l in labels]])
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markersize=8,
+                   markerfacecolor=palette[i], label=c)
+            for i, c in enumerate(cats)
+        ]
+        return point_colors, legend_handles, "Cell type"
+
     # mouse
     if color_hex is not None:
         point_colors = color_hex
@@ -1585,6 +1585,26 @@ def load_data(dataset, args):
         print("Loading COIL-20 (PCA-50) ...")
         X_pca, y, _ = load_coil20_data(n_pca=50,
                                         random_state=args.random_state)
+
+    elif dataset == "fashion_mnist":
+        print("Loading Fashion-MNIST (PCA-50) ...")
+        X_pca, y, _ = load_fashion_mnist_data(n_pca=50,
+                                               random_state=args.random_state)
+        if args.mnist_subsample and args.mnist_subsample < len(X_pca):
+            rng = np.random.default_rng(args.random_state)
+            sel = np.sort(rng.choice(len(X_pca), size=args.mnist_subsample,
+                                      replace=False))
+            X_pca, y = X_pca[sel], y[sel]
+
+    elif dataset == "swiss_roll":
+        print("Loading Swiss roll ...")
+        X_pca, y, _ = load_swiss_roll_data(random_state=args.random_state)
+
+    elif dataset == "pbmc3k":
+        print("Loading PBMC 3k (precomputed PCA-50) ...")
+        data_dir = args.mouse_data_dir or os.path.join(_SCRIPT_DIR, "data")
+        X_pca, y = load_pbmc3k_data(
+            os.path.join(data_dir, "pbmc3k_processed.h5ad"), n_pca=50)
     else:
         raise ValueError(f"Unknown dataset: {dataset!r}")
 
@@ -1765,52 +1785,18 @@ def plot_all_from_csv(args):
         df_smo = pd.read_csv(_csv(plots_dir, "embedding_smooth.csv"))
         labels = df_std["label"].values
         dataset = args.dataset
-        if dataset == "mnist":
-            palette      = plt.cm.tab10(np.linspace(0, 0.9, 10))
-            digits       = np.array([int(d) for d in labels])
-            point_colors = palette[digits]
-            legend_handles = [
-                Line2D([0], [0], marker="o", color="w", markersize=8,
-                       markerfacecolor=palette[d], label=str(d))
-                for d in range(10)
-            ]
-            legend_title = "Digit"
-        elif dataset == "adult":
-            pal          = {0: "#4393C3", 1: "#D6604D"}
-            point_colors = [pal[int(v)] for v in labels]
-            legend_handles = [
-                Line2D([0], [0], marker="o", color="w", markersize=8,
-                       markerfacecolor=pal[v],
-                       label="Income ≤50K" if v == 0 else "Income >50K")
-                for v in [0, 1]
-            ]
-            legend_title = "Income"
-        elif dataset == "coil20":
-            palette      = plt.cm.tab20(np.linspace(0, 1, 20))
-            objs         = np.array([int(v) for v in labels]) - 1
-            point_colors = palette[objs]
-            legend_handles = [
-                Line2D([0], [0], marker="o", color="w", markersize=8,
-                       markerfacecolor=palette[o], label=str(o + 1))
-                for o in range(20)
-            ]
-            legend_title = "Object"
-        else:  # mouse
-            # Prefer the per-point colour persisted in the CSV; fall back to
-            # reloading the Tasic cluster colours and indexing by cluster id
-            # (for CSVs written before the "color" column existed).
-            if "color" in df_std.columns:
-                point_colors = df_std["color"].values
-            else:
-                import pickle
-                data_dir = args.mouse_data_dir or os.path.join(
-                    _SCRIPT_DIR, "data")
-                with open(os.path.join(data_dir, "tasic2018.pickle"), "rb") as fh:
-                    cluster_colors_arr = pickle.load(fh)["clusterColors"]
-                point_colors = cluster_colors_arr[labels.astype(int)]
-
-            legend_handles = _mouse_major_legend_handles()
-            legend_title = "Cell type"
+        # Prefer the per-point colour persisted in the CSV; for legacy mouse
+        # CSVs without a "color" column, reload the Tasic cluster colours.
+        color_hex = df_std["color"].values if "color" in df_std.columns else None
+        cluster_colors_arr = None
+        if color_hex is None and dataset == "mouse":
+            import pickle
+            data_dir = args.mouse_data_dir or os.path.join(_SCRIPT_DIR, "data")
+            with open(os.path.join(data_dir, "tasic2018.pickle"), "rb") as fh:
+                cluster_colors_arr = pickle.load(fh)["clusterColors"]
+        point_colors, legend_handles, legend_title = _dataset_point_colors(
+            labels, dataset, cluster_colors_arr=cluster_colors_arr,
+            color_hex=color_hex)
 
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
         for ax, df_emb, ttl in [
@@ -2075,7 +2061,8 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--dataset",          required=True,
-                   choices=["mnist", "mouse", "adult", "coil20"])
+                   choices=["mnist", "mouse", "adult", "coil20",
+                            "fashion_mnist", "swiss_roll", "pbmc3k"])
     p.add_argument("--out_dir",          default=None)
     p.add_argument("--mouse_data_dir",   default=None)
     p.add_argument("--mouse_subsample",  type=int, default=None)
