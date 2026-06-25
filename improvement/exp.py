@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-exp.py  —  Curriculum-gamma t-SNE experiment
+exp.py  —  Schedule-gamma t-SNE experiment
 ============================================
 
 Question
@@ -34,7 +34,7 @@ What this script does
 2. Runs several MODELS, all with an identical total iteration budget for a
    fair comparison:
       - baselines: standard (γ=1), smooth, sharp
-      - a small sweep of 3-stage curriculum configurations
+      - a small sweep of 3-stage schedule configurations
 3. Evaluates each across the full neighbourhood-size range with two CURVES
    (saved to curves.csv, drawn as line charts over k=1..K_MAX):
       - NO@k    : Neighbourhood Overlap — fraction of the true k-NN preserved
@@ -44,7 +44,7 @@ What this script does
       - global_spearman: Spearman ρ of pairwise distances (global)
       - triplet_acc    : random-triplet distance-ordering accuracy (fair global)
 4. Aggregates over seeds, writes results.csv + curves.csv, draws the plots,
-   and prints an automatic VERDICT on whether the curriculum idea works.
+   and prints an automatic VERDICT on whether the schedule idea works.
 
 Usage
 -----
@@ -254,7 +254,7 @@ def joint_P_for_gamma(knn_idx, knn_dist, eff_perp, gamma, n_jobs=-1):
     """Build the symmetrized joint P for a given γ from a fixed kNN graph.
 
     Reusing the same neighbors/distances guarantees every γ-variant and every
-    curriculum stage shares one kNN graph — only the power transform changes.
+    schedule stage shares one kNN graph — only the power transform changes.
     """
     P, _ = joint_probabilities_nn(
         knn_idx, knn_dist, [eff_perp],
@@ -274,7 +274,7 @@ def run_single(P_joint, init, n_iter_ee, n_iter_main, ee, n_jobs=-1,
     return np.array(emb)
 
 
-def run_curriculum(stages, init, knn_idx, knn_dist, eff_perp, n_jobs=-1,
+def run_schedule(stages, init, knn_idx, knn_dist, eff_perp, n_jobs=-1,
                    random_state=42):
     """Multi-stage t-SNE with a per-stage γ.
 
@@ -306,7 +306,7 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
     (``total_iter``) so differences reflect the γ schedule, not compute.
 
     A baseline = (ee_iter early-exag iters) + (main iters), main = total-ee.
-    A curriculum splits ``total_iter`` across three γ stages, with the global
+    A schedule splits ``total_iter`` across three γ stages, with the global
     stage carrying the early-exaggeration phase.
     """
     main_iter = total_iter - ee_iter
@@ -330,18 +330,18 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
         "group": "baseline",
     }
 
-    # ── Curriculum sweep ──────────────────────────────────────────────────────
+    # ── Schedule sweep ──────────────────────────────────────────────────────
     # Stage 1 (global) always carries early exaggeration (ee, momentum 0.5).
     # The remaining (main_iter) iters are split between mid (γ=1) and local
     # (sharp γ).  We sweep the global γ, the sharp γ, and the mid/local split.
     rest = main_iter
 
-    def curric(g_global, g_sharp, frac_local):
+    def sched(g_global, g_sharp, frac_local):
         n_local = int(round(rest * frac_local))
         n_mid = rest - n_local
         return {
-            "kind": "curriculum",
-            "group": "curriculum",
+            "kind": "schedule",
+            "group": "schedule",
             "stages": [
                 {"gamma": g_global, "n_iter": ee_iter,
                  "exaggeration": ee,  "momentum": 0.5},   # GLOBAL  + early exag
@@ -356,14 +356,14 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
         gtag = f"glob{g_global:g}"
         for g_sharp in (gamma_sharp,):
             for frac_local, ftag in ((0.5, "split5050"), (0.66, "localheavy")):
-                name = f"curric_{gtag}_sharp{g_sharp:g}_{ftag}"
-                models[name] = curric(g_global, g_sharp, frac_local)
+                name = f"sched_{gtag}_sharp{g_sharp:g}_{ftag}"
+                models[name] = sched(g_global, g_sharp, frac_local)
 
     # A 2-stage ablation: smooth-global → sharp-local, skipping the γ=1 mid
     # stage, to test whether the mid stage matters.
     n_local = int(round(rest * 0.5))
-    models[f"curric_glob{gamma_smooth:g}_sharp{gamma_sharp:g}_no_mid"] = {
-        "kind": "curriculum", "group": "curriculum",
+    models[f"sched_glob{gamma_smooth:g}_sharp{gamma_sharp:g}_no_mid"] = {
+        "kind": "schedule", "group": "schedule",
         "stages": [
             {"gamma": gamma_smooth, "n_iter": ee_iter,
              "exaggeration": ee,  "momentum": 0.5},
@@ -372,33 +372,36 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
         ],
     }
 
-    # ── Winner of tune_curriculum.py: 3-stage γ=[smooth,1,sharp] with a
-    # FRONT-HEAVY 50/30/20 duration split (most time on the smooth global
-    # stage, least on the sharp local stage).  Unlike the sweep above — which
-    # fixes the global stage at exactly ee_iter — here the global stage gets
-    # 50% of the WHOLE budget, with early exaggeration as its first ee_iter
-    # iters (matching tune_curriculum.build_stages).  This is the recommended
-    # recipe; including it lets the multi-seed comparison reflect it.
-    n_glob = int(round(total_iter * 0.5))
-    n_mid_fh = int(round(total_iter * 0.3))
-    n_loc_fh = total_iter - n_glob - n_mid_fh
-    ee_c = min(ee_iter, n_glob)
-    fh_stages = [
-        {"gamma": gamma_smooth, "n_iter": ee_c,
-         "exaggeration": ee, "momentum": 0.5},            # GLOBAL + early exag
-    ]
-    if n_glob - ee_c > 0:
-        fh_stages.append({"gamma": gamma_smooth, "n_iter": n_glob - ee_c,
-                          "exaggeration": 1.0, "momentum": 0.8})  # GLOBAL plain
-    fh_stages += [
-        {"gamma": 1.0,         "n_iter": n_mid_fh,
-         "exaggeration": 1.0, "momentum": 0.8},           # MID
-        {"gamma": gamma_sharp, "n_iter": n_loc_fh,
-         "exaggeration": 1.0, "momentum": 0.8},           # LOCAL
-    ]
-    models[f"curric_glob{gamma_smooth:g}_sharp{gamma_sharp:g}_frontheavy"] = {
-        "kind": "curriculum", "group": "curriculum", "stages": fh_stages,
-    }
+    # ── Front-heavy 3-stage γ=[smooth,1,sharp] schedules (the tune_schedule.py
+    # winner family).  The global stage gets a large share of the WHOLE budget,
+    # with early exaggeration as its first ee_iter iters (matching
+    # tune_schedule.build_stages) — unlike the sweep above which fixes the
+    # global stage at exactly ee_iter.  We hold global at 50% and shift the
+    # remaining 50% from mid → local across variants: at 10k the original
+    # 50/30/20 under-sharpened locally, so we test giving local a bigger share.
+    def frontheavy(w_glob, w_mid, w_loc, tag):
+        n_g = int(round(total_iter * w_glob))
+        n_m = int(round(total_iter * w_mid))
+        n_l = total_iter - n_g - n_m
+        ee_c = min(ee_iter, n_g)
+        stages = [{"gamma": gamma_smooth, "n_iter": ee_c,
+                   "exaggeration": ee, "momentum": 0.5}]       # GLOBAL + early exag
+        if n_g - ee_c > 0:
+            stages.append({"gamma": gamma_smooth, "n_iter": n_g - ee_c,
+                           "exaggeration": 1.0, "momentum": 0.8})  # GLOBAL plain
+        stages += [
+            {"gamma": 1.0,         "n_iter": n_m,
+             "exaggeration": 1.0, "momentum": 0.8},           # MID
+            {"gamma": gamma_sharp, "n_iter": n_l,
+             "exaggeration": 1.0, "momentum": 0.8},           # LOCAL
+        ]
+        name = f"sched_glob{gamma_smooth:g}_sharp{gamma_sharp:g}_{tag}"
+        models[name] = {"kind": "schedule", "group": "schedule",
+                        "stages": stages}
+
+    frontheavy(0.5, 0.3, 0.2, "frontheavy")        # tuning winner (recipe)
+    frontheavy(0.5, 0.25, 0.25, "fh_502525")       # more local share
+    frontheavy(0.5, 0.2, 0.3, "fh_502030")         # even more local share
 
     return models
 
@@ -522,7 +525,7 @@ def run_all(args, out_dir):
                 # use their own initialization / optimizer internally.
                 Y = spec["fn"](X_pca, random_state=seed, n_jobs=args.n_jobs)
             else:
-                Y = run_curriculum(spec["stages"], init.copy(),
+                Y = run_schedule(spec["stages"], init.copy(),
                                    knn_idx, knn_dist, eff_perp,
                                    n_jobs=args.n_jobs, random_state=seed)
             scal, curves = evaluate(
@@ -569,19 +572,19 @@ _PALETTE = ["#332288", "#88CCEE", "#44AA99", "#117733", "#999933",
             "#DDCC77", "#CC6677", "#882255", "#AA4499", "#661100",
             "#6699CC", "#000000"]
 # marker + line style per group (used by exp.py's 3 groups and by the schedule
-# families that tune_curriculum.py adds); .get(..) fallbacks keep it open-ended.
-_GROUP_LS = {"baseline": (0, (5, 2)), "curriculum": "solid",
+# families that tune_schedule.py adds); .get(..) fallbacks keep it open-ended.
+_GROUP_LS = {"baseline": (0, (5, 2)), "schedule": "solid",
              "external": (0, (1, 1.2)),
              "reference": (0, (5, 2)), "ramp": "solid",
              "duration": (0, (3, 1, 1, 1)), "fine": (0, (1, 1.2))}
-_GROUP_MARKER = {"baseline": "s", "curriculum": "o", "external": "^",
+_GROUP_MARKER = {"baseline": "s", "schedule": "o", "external": "^",
                  "reference": "s", "ramp": "o", "duration": "D", "fine": "."}
-_GROUP_ORDER = {"baseline": 0, "curriculum": 1, "external": 2,
+_GROUP_ORDER = {"baseline": 0, "schedule": 1, "external": 2,
                 "reference": 0, "ramp": 1, "duration": 2, "fine": 3}
 
 
 def _pretty(name):
-    return name.replace("baseline_", "").replace("curric_", "")
+    return name.replace("baseline_", "").replace("sched_", "")
 
 
 def _groups_present(df):
@@ -756,7 +759,7 @@ def make_plots(scal_sum, curve_sum, out_dir, dataset):
 
 
 def verdict(scal_sum, curve_sum, out_dir, dataset):
-    """Decide whether the curriculum idea works and write a markdown report.
+    """Decide whether the schedule idea works and write a markdown report.
 
     The within-family local story uses NO@1-10 (t-SNE home-field, valid only
     among the γ models); the cross-method comparison uses ONLY the fair,
@@ -775,10 +778,10 @@ def verdict(scal_sum, curve_sum, out_dir, dataset):
     })
     cols = ["NO@1-10", "trust@10", "knn@10", "spearman", "triplet"]
     base = tbl[tbl["group"] == "baseline"]
-    curr = tbl[tbl["group"] == "curriculum"].copy()
+    curr = tbl[tbl["group"] == "schedule"].copy()
     ext = tbl[tbl["group"] == "external"]
 
-    lines = [f"# Curriculum-γ t-SNE — verdict ({dataset})\n"]
+    lines = [f"# Schedule-γ t-SNE — verdict ({dataset})\n"]
     lines.append(
         "Metrics: **NO@1-10** = local neighbour overlap (t-SNE-family "
         "home-field — comparable *only* within the γ models); **trust@10 / "
@@ -786,7 +789,7 @@ def verdict(scal_sum, curve_sum, out_dir, dataset):
         "structure.\n")
     lines.append("## Baselines\n")
     lines.append(base[cols].round(4).to_string())
-    lines.append("\n## Curriculum models\n")
+    lines.append("\n## Schedule models\n")
     lines.append(curr[cols].round(4).to_string())
 
     std = base.loc["baseline_standard"]
@@ -818,12 +821,12 @@ def verdict(scal_sum, curve_sum, out_dir, dataset):
     lines.append("\n## Verdict\n")
     works = False
     if not dom.empty:
-        lines.append(f"- **{len(dom)} curriculum config(s)** beat standard "
+        lines.append(f"- **{len(dom)} schedule config(s)** beat standard "
                      "t-SNE on local (NO), trust@10 AND global (spearman) "
                      "simultaneously.")
         works = True
     else:
-        lines.append("- No curriculum config beats standard t-SNE on local, "
+        lines.append("- No schedule config beats standard t-SNE on local, "
                      "trust and global at once.")
     lines.append(
         f"- Best trade-off config: **{bc.name}** — captures "
@@ -833,7 +836,7 @@ def verdict(scal_sum, curve_sum, out_dir, dataset):
     if bc["min_capture"] >= 0.5 and bc["local_capture"] > 0 \
             and bc["global_capture"] > 0:
         lines.append(
-            "- **CONCLUSION: the curriculum idea WORKS.** A single γ schedule "
+            "- **CONCLUSION: the schedule idea WORKS.** A single γ schedule "
             "reaches most of the sharp specialist's local quality AND most of "
             "the smooth specialist's global quality — escaping the trade-off "
             "any single fixed γ is stuck on.")
@@ -859,13 +862,13 @@ def verdict(scal_sum, curve_sum, out_dir, dataset):
             "triplet are method-agnostic.\n")
         fair = ["trust@10", "knn@10", "spearman", "triplet"]
         lines.append(ext[fair].round(4).to_string())
-        lines.append("\nBest curriculum (**" + str(bc.name) + "**): " +
+        lines.append("\nBest schedule (**" + str(bc.name) + "**): " +
                      ", ".join(f"{c}={bc[c]:.4f}" for c in fair) + ".\n")
         for mname, r in ext.iterrows():
             wins = [c for c in fair if bc[c] >= r[c]]
             txt = ("ties/beats on " + ", ".join(wins)) if wins \
                 else "loses on all fair metrics"
-            lines.append(f"- vs **{mname}**: curriculum {txt}.")
+            lines.append(f"- vs **{mname}**: schedule {txt}.")
 
     report = "\n".join(lines)
     path = os.path.join(out_dir, f"{dataset}_VERDICT.md")
@@ -941,7 +944,7 @@ def main():
         args.trust_subsample = min(args.trust_subsample, 1500)
 
     out_dir = args.out_dir or os.path.join(
-        _SCRIPT_DIR, "results", f"{args.dataset}_curriculum")
+        _SCRIPT_DIR, "results", f"{args.dataset}_schedule")
     os.makedirs(out_dir, exist_ok=True)
 
     if args.plot_only:

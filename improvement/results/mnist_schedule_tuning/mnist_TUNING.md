@@ -1,4 +1,4 @@
-# Curriculum-γ schedule search — mnist (single seed)
+# Schedule-γ schedule search — mnist (single seed)
 
 `balanced` = geometric mean of min-max-normalised local (NO@1-10) and global (spearman) scores across all configs. High only when a schedule is near-best on BOTH axes (escapes the trade-off). `local_n`/`global_n` are the normalised components.
 

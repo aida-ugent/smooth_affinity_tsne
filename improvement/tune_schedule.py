@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 """
-tune_curriculum.py  —  schedule search for curriculum-γ t-SNE
+tune_schedule.py  —  schedule search for scheduled-γ t-SNE
 =============================================================
 
-`exp.py` compares a small, fixed set of curriculum schedules against baselines
+`exp.py` compares a small, fixed set of schedule schedules against baselines
 and external DR.  THIS script instead *explores the schedule space itself* to
-find which curriculum design is best, before committing to one.
+find which schedule design is best, before committing to one.
 
-A curriculum schedule has three kinds of knob, all swept here:
+A schedule schedule has three kinds of knob, all swept here:
 
   * how many stages          (2, 3, 4, 5, ... up to a near-continuous ramp)
   * the γ at each stage       (from very smooth γ≈0 up to very sharp γ≈3)
@@ -22,7 +22,7 @@ evaluation metrics as `exp.py` (imported directly), so the numbers are directly
 comparable to that experiment.  Single seed by design — this is a search, not a
 significance test; re-run the winner through `exp.py` for the multi-seed story.
 
-Outputs (→ results/<dataset>_curriculum_tuning/):
+Outputs (→ results/<dataset>_schedule_tuning/):
   results.csv / curves.csv          scalar + curve metrics per schedule
   summary_scalars.csv / summary_curves.csv
   <dataset>_NO_curve.png            NO@k line chart  (same style as exp.py)
@@ -33,9 +33,9 @@ Outputs (→ results/<dataset>_curriculum_tuning/):
 
 Usage
 -----
-  python tune_curriculum.py --dataset mnist                # full search
-  python tune_curriculum.py --dataset mnist --quick        # fast smoke test
-  python tune_curriculum.py --dataset mnist --plot_only     # re-plot from csv
+  python tune_schedule.py --dataset mnist                # full search
+  python tune_schedule.py --dataset mnist --quick        # fast smoke test
+  python tune_schedule.py --dataset mnist --plot_only     # re-plot from csv
 """
 
 import os
@@ -98,7 +98,7 @@ def make_configs():
     """Define every schedule to search. Returns name -> spec dict."""
     cfg = {}
 
-    # ── single-γ references (context: the fixed points the curriculum must beat)
+    # ── single-γ references (context: the fixed points the schedule must beat)
     for g, tag in [(0.5, "smooth"), (1.0, "standard"), (2.0, "sharp")]:
         cfg[f"ref_{tag}"] = {"kind": "single", "group": "reference", "gamma": g}
 
@@ -106,7 +106,7 @@ def make_configs():
     for (g0, g1) in [(0.5, 2.0), (0.25, 2.5), (0.0, 3.0)]:
         for n in (2, 3, 4, 5):
             cfg[f"ramp_g{g0:g}-{g1:g}_s{n}"] = {
-                "kind": "curriculum", "group": "ramp",
+                "kind": "schedule", "group": "ramp",
                 "gammas": gamma_ramp(g0, g1, n), "weights": [1.0] * n}
 
     # ── duration splits on the canonical 3-stage 0.5 → 1 → 2 schedule ─────────
@@ -115,14 +115,14 @@ def make_configs():
                    ("backheavy",  [0.2, 0.3, 0.5]),
                    ("localheavy", [0.2, 0.2, 0.6])]:
         cfg[f"dur_3s_{tag}"] = {
-            "kind": "curriculum", "group": "duration",
+            "kind": "schedule", "group": "duration",
             "gammas": [0.5, 1.0, 2.0], "weights": w}
 
     # ── fine / near-continuous ramps (many small γ steps) ─────────────────────
     for (g0, g1) in [(0.0, 3.0), (0.5, 2.5)]:
         for n in (8, 12):
             cfg[f"fine_g{g0:g}-{g1:g}_s{n}"] = {
-                "kind": "curriculum", "group": "fine",
+                "kind": "schedule", "group": "fine",
                 "gammas": gamma_ramp(g0, g1, n), "weights": [1.0] * n}
 
     return cfg
@@ -184,7 +184,7 @@ def run_search(args, out_dir):
         else:
             stages = build_stages(spec["gammas"], spec["weights"],
                                   args.ee_iter, args.total_iter, args.ee)
-            Y = exp.run_curriculum(stages, init.copy(), knn_idx, knn_dist,
+            Y = exp.run_schedule(stages, init.copy(), knn_idx, knn_dist,
                                    eff_perp, n_jobs=args.n_jobs,
                                    random_state=seed)
         scal, curves = exp.evaluate(
@@ -255,7 +255,7 @@ def tuning_report(scal_sum, curve_sum, out_dir, dataset):
         "balanced", ascending=False)
 
     cols = ["NO@1-10", "trust@10", "knn@10", "spearman", "triplet"]
-    lines = [f"# Curriculum-γ schedule search — {dataset} (single seed)\n"]
+    lines = [f"# Schedule-γ schedule search — {dataset} (single seed)\n"]
     lines.append("`balanced` = geometric mean of min-max-normalised local "
                  "(NO@1-10) and global (spearman) scores across all configs. "
                  "High only when a schedule is near-best on BOTH axes (escapes "
@@ -339,7 +339,7 @@ def main():
         args.trust_subsample = min(args.trust_subsample, 1500)
 
     out_dir = args.out_dir or os.path.join(
-        exp._SCRIPT_DIR, "results", f"{args.dataset}_curriculum_tuning")
+        exp._SCRIPT_DIR, "results", f"{args.dataset}_schedule_tuning")
     os.makedirs(out_dir, exist_ok=True)
 
     if args.plot_only:

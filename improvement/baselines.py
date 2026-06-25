@@ -5,7 +5,7 @@ baselines.py  —  external dimensionality-reduction methods for comparison
 
 Each ``run_*`` function takes a feature matrix ``X`` (n, d) and a
 ``random_state`` and returns a 2-D embedding ``Y`` (n, 2) as a float64
-numpy array, so the curriculum-γ t-SNE in ``exp.py`` can be compared against
+numpy array, so the schedule-γ t-SNE in ``exp.py`` can be compared against
 them with identical metrics on identical data.
 
 Methods
