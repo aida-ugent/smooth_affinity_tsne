@@ -583,6 +583,30 @@ _GROUP_ORDER = {"baseline": 0, "schedule": 1, "external": 2,
                 "reference": 0, "ramp": 1, "duration": 2, "fine": 3}
 
 
+# The schedule group contains many near-identical configs; plotting them all
+# makes the figures unreadable. For the plots we show ONE representative schedule
+# (the tuning winner) alongside every baseline and external method. All configs
+# are kept in results.csv and in the verdict tables — this only declutters plots.
+_PLOT_SCHEDULE_REP = "sched_glob0.5_sharp2_frontheavy"
+
+
+def _plot_models(summary):
+    """Model subset to draw: everything except the schedule group, plus one
+    representative schedule config (``_PLOT_SCHEDULE_REP`` if present, else the
+    schedule model with the best global Spearman)."""
+    non_sched = summary[summary["group"] != "schedule"]["model"].tolist()
+    sched = summary[summary["group"] == "schedule"]
+    rep = []
+    if not sched.empty:
+        if (sched["model"] == _PLOT_SCHEDULE_REP).any():
+            rep = [_PLOT_SCHEDULE_REP]
+        elif "spearman_mean" in sched.columns:
+            rep = [sched.loc[sched["spearman_mean"].idxmax(), "model"]]
+        else:
+            rep = [sched["model"].iloc[0]]
+    return set(non_sched) | set(rep)
+
+
 def _pretty(name):
     return name.replace("baseline_", "").replace("sched_", "")
 
@@ -741,6 +765,10 @@ def make_plots(scal_sum, curve_sum, out_dir, dataset):
     p_tr = os.path.join(out_dir, f"{dataset}_trustworthiness_curve.png")
     p_sc = os.path.join(out_dir, f"{dataset}_scalar_metrics.png")
     p_td = os.path.join(out_dir, f"{dataset}_tradeoff_scatter.png")
+    # Declutter: draw baselines + externals + one representative schedule only.
+    keep = _plot_models(scal_sum)
+    scal_sum = scal_sum[scal_sum["model"].isin(keep)].copy()
+    curve_sum = curve_sum[curve_sum["model"].isin(keep)].copy()
     _plot_curve(
         curve_sum, "no_mean", "no_std",
         "Neighbourhood Overlap   NO@k",
