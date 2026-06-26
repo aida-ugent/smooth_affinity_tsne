@@ -150,34 +150,33 @@ _EXP8_COLORS = {
     200: "#CC79A7",  # pink
 }
 
-# Per-dataset y-axis range for the exp8 global-Spearman plot.  Global Spearman ρ
-# sits in a different band on each dataset, so a single shared range either
-# clips or cramps; these are scaled to each dataset's observed values.
-_EXP8_YLIM = {
+# Per-dataset y-axis ranges for the exp7/8/9 line plots.  These are hand-tuned
+# to each dataset's observed band so the curves fill the panel without clipping.
+# They are *only* applied to the datasets listed here; any other dataset is left
+# to matplotlib's autoscale (see _apply_ylim), so new datasets whose values sit
+# outside these bands are never clipped to an empty/truncated plot.
+_EXP8_YLIM = {                       # exp8 global-Spearman ρ
     "mnist": (0.30, 0.45),
     "mouse": (0.40, 0.80),
     "adult": (0.20, 0.55),
 }
-_EXP8_YLIM_DEFAULT = (0.20, 0.60)
-
-# Per-dataset y-axis range for the exp7 Neighborhood-Overlap comparison
-# (mean NH@k curves), scaled to each dataset's observed band.
-_EXP7_YLIM = {
+_EXP7_YLIM = {                       # exp7 Neighborhood-Overlap mean NH@k curves
     "mnist": (0.24, 0.44),
     "mouse": (0.20, 0.68),
     "adult": (0.35, 0.60),
 }
-_EXP7_YLIM_DEFAULT = (0.22, 0.45)
-
-# Per-dataset y-axis range for the exp9 best-ρ envelope plot (09a).  The
-# envelope (max over perplexities) sits higher than the single-ρ curves, so
-# these bands differ from the exp7 ones.
-_EXP9_YLIM = {
+_EXP9_YLIM = {                       # exp9 best-ρ envelope (sits higher than exp7)
     "mnist": (0.33, 0.57),
     "mouse": (0.45, 0.70),
     "adult": (0.38, 0.65),
 }
-_EXP9_YLIM_DEFAULT = (0.22, 0.45)
+
+
+def _apply_ylim(ax, curated, dataset):
+    """Apply the hand-tuned y-range for a known dataset; otherwise leave
+    matplotlib's autoscale untouched so the data is never clipped."""
+    if dataset in curated:
+        ax.set_ylim(*curated[dataset])
 
 # Fashion-MNIST class id -> garment name (for the embedding legends).
 _FASHION_CLASSES = [
@@ -988,7 +987,7 @@ def exp7_nh_comparison(X_pca, X_eval, out_dir,
         ax.plot(k_vals_plot, mn, color=color, ls=ls, lw=lw, label=lbl)
     ax.set_xlabel("k")
     ax.set_ylabel("Neighborhood Overlap")
-    ax.set_ylim(*_EXP7_YLIM.get(dataset, _EXP7_YLIM_DEFAULT))
+    _apply_ylim(ax, _EXP7_YLIM, dataset)
     _p7 = "(a) " if dataset == "mnist" else ""
     ax.set_title(f"{_p7}Neighborhood Overlap  (ρ={perplexity})")
     ax.legend(fontsize=13, frameon=False)
@@ -1067,7 +1066,7 @@ def exp8_global_spearman_vs_gamma(X_pca, X_eval, out_dir,
     ax.set_xlabel("γ")
     ax.set_ylabel("Global Spearman ρ")
     # Per-dataset y-range, scaled to each dataset's band of Global Spearman ρ.
-    ax.set_ylim(*_EXP8_YLIM.get(dataset, _EXP8_YLIM_DEFAULT))
+    _apply_ylim(ax, _EXP8_YLIM, dataset)
     _prefix = "" if dataset in ("mouse", "adult") else "(a) "
     ax.set_title(f"{_prefix}Effect of γ on global structure preservation")
     ax.legend(fontsize=13, frameon=False)
@@ -1209,7 +1208,7 @@ def exp9_smooth_vs_envelope(X_pca, X_eval, out_dir,
             label=f"smooth  γ={gamma_s}  (best ρ per k)")
     ax.set_xlabel("k")
     ax.set_ylabel("Neighborhood Overlap")
-    ax.set_ylim(*_EXP9_YLIM.get(dataset, _EXP9_YLIM_DEFAULT))
+    _apply_ylim(ax, _EXP9_YLIM, dataset)
     ax.set_title(f"Smooth vs standard t-SNE — best ρ envelope  (γ={gamma_s})")
     ax.legend(fontsize=13, frameon=False)
     _clean_axes(ax)
@@ -1861,7 +1860,7 @@ def plot_all_from_csv(args):
             ax.plot(k_vals_plot, mn, color=c, ls=ls, lw=lw, label=lbl)
         ax.set_xlabel("k")
         ax.set_ylabel("Neighborhood Overlap")
-        ax.set_ylim(*_EXP7_YLIM.get(args.dataset, _EXP7_YLIM_DEFAULT))
+        _apply_ylim(ax, _EXP7_YLIM, args.dataset)
         _p7 = "(a) " if args.dataset == "mnist" else ""
         ax.set_title(f"{_p7}Neighborhood Overlap  (ρ={args.perplexity})")
         ax.legend(fontsize=13, frameon=False)
@@ -1895,7 +1894,7 @@ def plot_all_from_csv(args):
         ax.set_xlabel("γ")
         ax.set_ylabel("Global Spearman ρ")
         # Per-dataset y-range, scaled to each dataset's band of Global Spearman ρ.
-        ax.set_ylim(*_EXP8_YLIM.get(args.dataset, _EXP8_YLIM_DEFAULT))
+        _apply_ylim(ax, _EXP8_YLIM, args.dataset)
         _prefix8 = "" if args.dataset in ("mouse", "adult") else "(a) "
         ax.set_title(f"{_prefix8}Effect of γ on global structure preservation")
         ax.legend(fontsize=13, frameon=False)
@@ -1945,7 +1944,7 @@ def plot_all_from_csv(args):
         ax.plot(k_ax, mn_smo, color=C_GREEN_LOC, lw=2.2, ls="--",
                 label=f"smooth  γ={gamma_s9}  (best ρ per k)")
         ax.set_xlabel("k"); ax.set_ylabel("Neighborhood Overlap")
-        ax.set_ylim(*_EXP9_YLIM.get(args.dataset, _EXP9_YLIM_DEFAULT))
+        _apply_ylim(ax, _EXP9_YLIM, args.dataset)
         ax.set_title(f"Smooth vs standard — best ρ envelope  (γ={gamma_s9})")
         ax.legend(fontsize=13, frameon=False)
         _clean_axes(ax); plt.tight_layout()
