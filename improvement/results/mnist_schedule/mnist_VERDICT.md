@@ -20,6 +20,7 @@ sched_glob0.5_sharp2_no_mid       0.4993    0.9630  0.9125    0.4208   0.6504
 sched_glob0.5_sharp2_split5050    0.4960    0.9710  0.9190    0.4227   0.6482
 sched_glob1_sharp2_localheavy     0.4970    0.9706  0.9184    0.3705   0.6327
 sched_glob1_sharp2_split5050      0.4960    0.9702  0.9186    0.3731   0.6339
+sched_pacmap_blend                0.4974    0.9687  0.9170    0.3891   0.6377
 
 ## Headroom capture (local=NO@1-10, global=spearman; vs standard, normalised to best baseline)
 
@@ -32,6 +33,7 @@ sched_glob0.5_sharp2_no_mid              0.856           0.822        0.822
 sched_glob0.5_sharp2_split5050           0.649           0.857        0.649
 sched_glob1_sharp2_localheavy            0.710          -0.059       -0.059
 sched_glob1_sharp2_split5050             0.652          -0.013       -0.013
+sched_pacmap_blend                       0.740           0.266        0.266
 
 ## Verdict
 

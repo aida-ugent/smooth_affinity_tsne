@@ -295,6 +295,53 @@ def run_schedule(stages, init, knn_idx, knn_dist, eff_perp, n_jobs=-1,
     return np.array(emb)
 
 
+def run_blend_schedule(P_glob, P_loc, init, phases, ee, ee_iter,
+                       anneal_every=25, n_jobs=-1, random_state=42):
+    """PaCMAP-style blended-affinity schedule (Option A).
+
+    A single t-SNE loss with two attractive terms — a SMOOTH (global, ↔ PaCMAP
+    mid-near) and a SHARP (local, ↔ PaCMAP neighbor) γ-affinity — whose weights
+    are annealed across phases. Because the two KL terms share the low-D kernel
+    Q, with fixed weights ``w_g·KL(P_glob‖Q) + w_l·KL(P_loc‖Q)`` has the SAME
+    gradient as ``KL(P_eff‖Q)`` with ``P_eff = w_g·P_glob + w_l·P_loc`` (the
+    entropy parts are constant in Y). So we realise the weighted multi-term loss
+    by feeding the optimizer the blended affinity, rebuilt every ``anneal_every``
+    iters to track the annealing. Weights are renormalised to sum to 1 so the
+    repulsion balance stays standard.
+
+    ``phases``: list of dicts {name, iters, glob:(w0,w1), loc:(w0,w1)} giving the
+    per-phase start/end weights of each term (linearly annealed within a phase).
+    The first ``ee_iter`` total iterations carry early exaggeration.
+    """
+    def _lerp(pair, f):
+        a, b = pair
+        return a + (b - a) * f
+
+    def _blend(wg, wl):
+        s = wg + wl
+        wg, wl = wg / s, wl / s          # renormalise so Σw = 1
+        return (P_glob * wg + P_loc * wl).tocsr()
+
+    aff = _MutableAff(_blend(*[_lerp(phases[0][k], 0.0) for k in ("glob", "loc")]))
+    emb = TSNEEmbedding(init, aff, n_jobs=n_jobs, random_state=random_state)
+    it_total = 0
+    for ph in phases:
+        n = ph["iters"]
+        done = 0
+        while done < n:
+            step = min(anneal_every, n - done)
+            f = (done + 0.5 * step) / n if n > 0 else 0.0   # chunk midpoint
+            aff.P = _blend(_lerp(ph["glob"], f), _lerp(ph["loc"], f))
+            if it_total < ee_iter:                           # early-exag warmup
+                exag, mom = ee, 0.5
+            else:
+                exag, mom = 1.0, 0.8
+            emb.optimize(step, exaggeration=exag, momentum=mom, inplace=True)
+            done += step
+            it_total += step
+    return np.array(emb)
+
+
 # =============================================================================
 # Model definitions
 # =============================================================================
@@ -402,6 +449,27 @@ def make_models(total_iter, ee_iter, ee, gamma_smooth, gamma_sharp):
     frontheavy(0.5, 0.3, 0.2, "frontheavy")        # tuning winner (recipe)
     frontheavy(0.5, 0.25, 0.25, "fh_502525")       # more local share
     frontheavy(0.5, 0.2, 0.3, "fh_502030")         # even more local share
+
+    # ── PaCMAP-style blended schedule (Option A) ─────────────────────────────
+    # Two attractive γ-affinities held LIVE simultaneously — smooth (global ↔
+    # PaCMAP mid-near) + sharp (local ↔ PaCMAP neighbor) — with weights annealed
+    # across PaCMAP's 3 phases (proportions 100/100/250 of 450).  Weights below
+    # are PaCMAP's own (w_NB,w_MN) normalised to sum to 1: phase 1 starts
+    # mid-near-dominated and anneals toward balanced, phase 2 is balanced, phase
+    # 3 drops the global term entirely (local only).  Same γ values as the other
+    # schedules, so this isolates the blend-vs-hard-switch mechanism.
+    f1, f2 = round(total_iter * 100 / 450), round(total_iter * 100 / 450)
+    f3 = total_iter - f1 - f2
+    models["sched_pacmap_blend"] = {
+        "kind": "blend", "group": "schedule",
+        "gamma_glob": gamma_smooth, "gamma_loc": gamma_sharp,
+        "ee": ee, "ee_iter": ee_iter,
+        "phases": [
+            {"name": "global", "iters": f1, "glob": (1.0, 0.6), "loc": (0.0, 0.4)},
+            {"name": "mid",    "iters": f2, "glob": (0.5, 0.5), "loc": (0.5, 0.5)},
+            {"name": "local",  "iters": f3, "glob": (0.0, 0.0), "loc": (1.0, 1.0)},
+        ],
+    }
 
     return models
 
@@ -524,6 +592,14 @@ def run_all(args, out_dir):
                 # external methods run on the same PCA features and seed, but
                 # use their own initialization / optimizer internally.
                 Y = spec["fn"](X_pca, random_state=seed, n_jobs=args.n_jobs)
+            elif spec["kind"] == "blend":
+                P_glob = joint_P_for_gamma(knn_idx, knn_dist, eff_perp,
+                                           spec["gamma_glob"], n_jobs=args.n_jobs)
+                P_loc = joint_P_for_gamma(knn_idx, knn_dist, eff_perp,
+                                          spec["gamma_loc"], n_jobs=args.n_jobs)
+                Y = run_blend_schedule(P_glob, P_loc, init.copy(), spec["phases"],
+                                       spec["ee"], spec["ee_iter"],
+                                       n_jobs=args.n_jobs, random_state=seed)
             else:
                 Y = run_schedule(spec["stages"], init.copy(),
                                    knn_idx, knn_dist, eff_perp,
@@ -587,24 +663,26 @@ _GROUP_ORDER = {"baseline": 0, "schedule": 1, "external": 2,
 # makes the figures unreadable. For the plots we show ONE representative schedule
 # (the tuning winner) alongside every baseline and external method. All configs
 # are kept in results.csv and in the verdict tables — this only declutters plots.
-_PLOT_SCHEDULE_REP = "sched_glob0.5_sharp2_frontheavy"
+# Representative schedule configs to draw (the rest of the schedule group is
+# kept in results.csv / the verdict but omitted from plots to avoid clutter):
+# the hard-switch tuning winner and the PaCMAP-style blended schedule.
+_PLOT_SCHEDULE_REPS = ["sched_glob0.5_sharp2_frontheavy", "sched_pacmap_blend"]
 
 
 def _plot_models(summary):
-    """Model subset to draw: everything except the schedule group, plus one
-    representative schedule config (``_PLOT_SCHEDULE_REP`` if present, else the
-    schedule model with the best global Spearman)."""
+    """Model subset to draw: everything except the schedule group, plus the
+    representative schedule configs (those in ``_PLOT_SCHEDULE_REPS`` that are
+    present; else the schedule model with the best global Spearman)."""
     non_sched = summary[summary["group"] != "schedule"]["model"].tolist()
     sched = summary[summary["group"] == "schedule"]
-    rep = []
+    reps = []
     if not sched.empty:
-        if (sched["model"] == _PLOT_SCHEDULE_REP).any():
-            rep = [_PLOT_SCHEDULE_REP]
-        elif "spearman_mean" in sched.columns:
-            rep = [sched.loc[sched["spearman_mean"].idxmax(), "model"]]
-        else:
-            rep = [sched["model"].iloc[0]]
-    return set(non_sched) | set(rep)
+        reps = [m for m in _PLOT_SCHEDULE_REPS if (sched["model"] == m).any()]
+        if not reps:
+            reps = ([sched.loc[sched["spearman_mean"].idxmax(), "model"]]
+                    if "spearman_mean" in sched.columns
+                    else [sched["model"].iloc[0]])
+    return set(non_sched) | set(reps)
 
 
 def _pretty(name):
