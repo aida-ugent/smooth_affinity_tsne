@@ -137,6 +137,35 @@ def load_dataset(args):
     elif args.dataset == "adult":
         print(f"\nLoading Adult dataset (max_rows={args.adult_max_rows}) ...")
         return load_adult(args.adult_max_rows, args.random_state)
+    elif args.dataset == "coil20":
+        from load_data import load_coil20_data
+        print("\nLoading COIL-20 (PCA-50) ...")
+        X_pca, y, _ = load_coil20_data(n_pca=50, random_state=args.random_state)
+        return X_pca, y
+    elif args.dataset == "fashion_mnist":
+        from load_data import load_fashion_mnist_data
+        print(f"\nLoading Fashion-MNIST (subsample="
+              f"{args.mnist_subsample or 'full'}) ...")
+        X_pca, y, _ = load_fashion_mnist_data(n_pca=50,
+                                              random_state=args.random_state)
+        if args.mnist_subsample and args.mnist_subsample < len(X_pca):
+            rng = np.random.default_rng(args.random_state)
+            idx = np.sort(rng.choice(len(X_pca), size=args.mnist_subsample,
+                                     replace=False))
+            X_pca, y = X_pca[idx], y[idx]
+        return X_pca, y
+    elif args.dataset == "swiss_roll":
+        from load_data import load_swiss_roll_data
+        print("\nGenerating Swiss roll ...")
+        X, y, _ = load_swiss_roll_data(random_state=args.random_state)
+        return X, y
+    elif args.dataset == "pbmc3k":
+        from load_data import load_pbmc3k_data
+        data_dir = args.mouse_data_dir or os.path.join(_SCRIPT_DIR, "data")
+        print("\nLoading PBMC 3k (precomputed PCA-50) ...")
+        X_pca, y = load_pbmc3k_data(
+            os.path.join(data_dir, "pbmc3k_processed.h5ad"), n_pca=50)
+        return X_pca, y
     else:
         raise ValueError(f"Unknown dataset: {args.dataset!r}")
 
@@ -369,7 +398,9 @@ def parse_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     # Dataset
-    p.add_argument("--dataset",          choices=["mnist", "mouse", "adult"],
+    p.add_argument("--dataset",
+                   choices=["mnist", "mouse", "adult", "coil20",
+                            "fashion_mnist", "swiss_roll", "pbmc3k"],
                    default="mnist")
     # MNIST options
     p.add_argument("--mnist_subsample",  type=int,   default=0,
