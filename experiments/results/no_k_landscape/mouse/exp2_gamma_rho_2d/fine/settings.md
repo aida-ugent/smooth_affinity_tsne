@@ -1,0 +1,73 @@
+# Experiment 2 — (γ, ρ) landscape (fine)
+
+```json
+{
+  "experiment": "no_k_gamma_rho_2d",
+  "mode": "fine",
+  "dataset": "mnist",
+  "n_points": 23822,
+  "n_subsample": null,
+  "gammas": [
+    0.0,
+    0.21428571428571427,
+    0.42857142857142855,
+    0.6428571428571428,
+    0.8571428571428571,
+    1.0714285714285714,
+    1.2857142857142856,
+    1.5,
+    1.7142857142857142,
+    1.9285714285714284,
+    2.142857142857143,
+    2.357142857142857,
+    2.571428571428571,
+    2.7857142857142856,
+    3.0
+  ],
+  "rhos": [
+    10,
+    20,
+    30,
+    50,
+    75,
+    100,
+    125,
+    150,
+    175,
+    200
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "target_ks": [
+    10,
+    30,
+    100
+  ],
+  "auc_near": [
+    1,
+    10
+  ],
+  "auc_mid": [
+    11,
+    90
+  ],
+  "k_max": 100,
+  "knn_seed": 42,
+  "data_seed": 42,
+  "tsne_settings": {
+    "init": "pca",
+    "early_exaggeration": 12.0,
+    "early_exaggeration_iter": 250,
+    "n_iter": 750,
+    "ee_momentum": 0.5,
+    "main_momentum": 0.8,
+    "metric": "euclidean",
+    "pca_dims": 50
+  }
+}
+```
