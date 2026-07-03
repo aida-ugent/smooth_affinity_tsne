@@ -264,6 +264,36 @@ def joint_P_for_gamma(neighbors, distances, eff_perplexity, gamma, n_jobs=-1):
     return P
 
 
+def conditional_rows_for_gamma(distances, eff_perplexity, gamma, n_jobs=-1):
+    """Dense smoothed conditional rows ``p̃_{j|i}`` for a given gamma.
+
+    Returns an ``(n_samples, k_neighbors)`` float array whose row ``i`` is the
+    conditional neighbor distribution ``p̃_{j|i}`` over point ``i``'s kept
+    neighbors, *after* the gamma power-transform but *before* symmetrization —
+    i.e. exactly the ``conditional_P`` array the library builds internally in
+    ``joint_probabilities_nn`` (affinity.py:505-518). Each row sums to 1.
+
+    This is the object the effective-neighborhood-size measures are computed
+    from: effective size is a property of the high-dimensional affinity rows
+    alone, so no embedding is needed. Reusing ``_tsne.compute_gaussian_perplexity``
+    with the cached ``effective_perplexity_`` guarantees these rows are
+    byte-identical to the ones that produced the stored NO@k results (the same
+    neighbor cache and gamma transform feed both).
+    """
+    from openTSNE import _tsne
+
+    conditional_P = _tsne.compute_gaussian_perplexity(
+        np.array(distances, dtype=float),
+        np.array([eff_perplexity], dtype=float),
+        num_threads=n_jobs,
+    )
+    conditional_P = np.asarray(conditional_P)
+    if gamma != 1.0:
+        conditional_P **= gamma
+        conditional_P /= conditional_P.sum(axis=1, keepdims=True)
+    return conditional_P
+
+
 def embed_from_P(X_pca, P_joint, seed, n_jobs=-1,
                  ee=None, ee_iter=None, n_iter=None):
     """Run t-SNE from a precomputed joint P with paper-faithful settings.

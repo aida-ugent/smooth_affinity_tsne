@@ -23,6 +23,8 @@ init's per-seed jitter (paper-faithful).
 | `../../no_k_landscape_common.py` | Shared helpers: data loading, neighbor-graph caching, γ→P (reuses `joint_probabilities_nn`), t-SNE-from-P, vectorised NO@k + one-pass full curve, figures, and a `--self_test`. |
 | `../../no_k_gamma_sweep_1d.py` | **Experiment 1** — NO@k vs γ at fixed ρ for four (k, ρ) settings, with a ±1 std band over seeds. |
 | `../../no_k_gamma_rho_2d.py` | **Experiment 2** — NO@k over the (γ, ρ) grid: per-target-k surfaces + AUC summaries. |
+| `../../no_k_perplexity_sweep_1d.py` | **Experiment 3** — NO@k vs ρ at fixed γ (the mirror of Exp 1). |
+| `../../no_k_effective_size.py` | **Experiment 4** — effective neighborhood size, the latent variable behind NO@k. Measures the effective size of the smoothed conditional rows `p̃_{j\|i}` directly (no embeddings; reuses Exp 2's cached NO@k) and tests whether NO@k collapses onto one hump peaking at a stable effective-size/k ratio. |
 
 ## How to run
 
@@ -44,9 +46,17 @@ python no_k_gamma_sweep_1d.py --staircase   # + the piecewise-constant sanity ch
 python no_k_gamma_rho_2d.py --mode coarse
 python no_k_gamma_rho_2d.py --mode fine
 
+# 4) Experiment 4: effective neighborhood size (needs Exp 2 *fine* run first).
+#    Recomputes only the HD conditional rows (no embeddings), then reuses the
+#    cached NO@k. --all does mnist, fashion_mnist, mouse and the cross-dataset summary.
+python no_k_effective_size.py --self_test        # conditional rows == library
+python no_k_effective_size.py --all              # 3 datasets + summary + FINDINGS
+python no_k_effective_size.py --summary          # rebuild overlay + FINDINGS from cells
+
 # Regenerate any figure from saved CSVs without recomputing embeddings
 python no_k_gamma_sweep_1d.py --plot_only
 python no_k_gamma_rho_2d.py --mode coarse --plot_only
+python no_k_effective_size.py --all --plot_only
 ```
 
 ## Changing the grid resolution
@@ -92,4 +102,22 @@ exp2_gamma_rho_2d/{coarse,fine}/
   surfaces_per_k_panel.png              combined per-k panel
   optima.csv / optima.md                best (γ, ρ) per k + ridge/basin note
   settings.json / settings.md
+exp4_effective_size/                    (per dataset)
+  effective_size_cells.csv / .npz       raw per-(ρ, γ) effective sizes (5 measures,
+                                        mean + per-point std, averaged over points)
+  no_k_vs_effsize.csv                   merged eff-size ↔ seed-aggregated NO@k
+  direction_{dataset}.png               eff size vs ρ (fixed γ) and vs γ (fixed ρ)
+  scatter_{measure}_{dataset}.png       NO@k vs eff/k, coloured by k, peak band
+  settings.json / settings.md
+exp4_effective_size_summary/            (across datasets)
+  scatter_{measure}_all_datasets.png    NO@k vs eff/k overlaid, coloured by dataset
+  collapse_summary.csv                  per-scope tightness + peak band per measure
+  direction_summary.csv                 eff-size direction vs ρ per (dataset, measure)
+  FINDINGS.md                           tightest collapse, peak-ratio stability, ρ-direction
 ```
+
+**Exp 4 headline:** NO@k vs (effective size ÷ k) collapses onto a single hump for
+every measure; the per-dataset peak **bands overlap** (participation ratio peaks at
+eff/k ∈ [0.32, 1.24] ≈ **1** — the effective #neighbors ≈ k), and effective size
+**rises monotonically with ρ** (and falls with γ) for all measures — so a single
+effective size, set jointly by γ and ρ, is the latent variable behind NO@k.
