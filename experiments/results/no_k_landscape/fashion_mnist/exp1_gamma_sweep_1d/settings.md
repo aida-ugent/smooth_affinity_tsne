@@ -3,7 +3,7 @@
 ```json
 {
   "experiment": "no_k_gamma_sweep_1d",
-  "dataset": "mnist",
+  "dataset": "fashion_mnist",
   "n_points": 70000,
   "n_subsample": null,
   "gammas": [

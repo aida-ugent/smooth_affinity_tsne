@@ -4,7 +4,7 @@
 {
   "experiment": "no_k_gamma_rho_2d",
   "mode": "fine",
-  "dataset": "mnist",
+  "dataset": "mouse",
   "n_points": 23822,
   "n_subsample": null,
   "gammas": [

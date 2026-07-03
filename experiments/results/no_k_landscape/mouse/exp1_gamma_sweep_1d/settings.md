@@ -3,7 +3,7 @@
 ```json
 {
   "experiment": "no_k_gamma_sweep_1d",
-  "dataset": "mnist",
+  "dataset": "mouse",
   "n_points": 23822,
   "n_subsample": null,
   "gammas": [

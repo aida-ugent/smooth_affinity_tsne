@@ -4,7 +4,7 @@
 {
   "experiment": "no_k_gamma_rho_2d",
   "mode": "coarse",
-  "dataset": "mnist",
+  "dataset": "fashion_mnist",
   "n_points": 70000,
   "n_subsample": null,
   "gammas": [
