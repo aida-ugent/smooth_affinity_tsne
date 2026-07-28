@@ -14,3 +14,6 @@ dist/
 *.h5ad
 experiments/data/tasic2018.pickle
 experiments/data/pbmc3k_processed.h5ad
+# Exp 11 stores full embeddings for every (perplexity, gamma) cell; these CSVs
+# are large (up to ~75 MB) and regenerable — the figure is the deliverable.
+experiments/results/*/exp11_embedding_grid/embedding_grid.csv
