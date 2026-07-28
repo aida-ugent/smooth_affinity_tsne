@@ -1,0 +1,49 @@
+{
+  "experiment": "no_k_perplexity_sweep_1d",
+  "dataset": "adult",
+  "n_points": 10000,
+  "n_subsample": null,
+  "perplexities": [
+    5,
+    8,
+    12,
+    18,
+    25,
+    35,
+    50,
+    70,
+    95,
+    125,
+    160,
+    200
+  ],
+  "gammas": [
+    0.8,
+    1.0,
+    1.2
+  ],
+  "target_ks": [
+    30,
+    100
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "k_max": 100,
+  "knn_seed": 42,
+  "data_seed": 42,
+  "tsne_settings": {
+    "init": "pca",
+    "early_exaggeration": 12.0,
+    "early_exaggeration_iter": 250,
+    "n_iter": 750,
+    "ee_momentum": 0.5,
+    "main_momentum": 0.8,
+    "metric": "euclidean",
+    "pca_dims": 50
+  }
+}
