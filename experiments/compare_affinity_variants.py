@@ -2,9 +2,9 @@
 compare_affinity_variants.py
 
 Compare 8 affinity configurations for t-SNE using
-Neighborhood Overlap @ k (NH@k) as the quality metric.
+Neighborhood Overlap @ k (NO@k) as the quality metric.
 
-NH@k measures how well the local HD structure is preserved in the embedding:
+NO@k measures how well the local HD structure is preserved in the embedding:
 for each point, it counts the fraction of its k HD neighbors that also appear
 among its k LD neighbors, then averages over all points.
 
@@ -291,11 +291,11 @@ def knn_indices(X, k, n_jobs=-1):
 
 def nh_curve(hd_nbrs, ld_nbrs, k_max):
     """
-    Compute NH@k for every k from 1 to k_max given pre-built index arrays.
+    Compute NO@k for every k from 1 to k_max given pre-built index arrays.
 
     Uses the same set-intersection approach as exp4 in the main script.
     hd_nbrs, ld_nbrs : (n, k_max) int arrays
-    Returns           : (k_max,) float array, result[k-1] = mean NH@k
+    Returns           : (k_max,) float array, result[k-1] = mean NO@k
     """
     n = len(hd_nbrs)
     return np.array([
@@ -345,9 +345,9 @@ def plot_nh_curves(df, out_dir, k_max=None, dataset="mnist"):
         ax.plot(k_vals, mn.values, color=color, lw=lw, ls=ls, label=method)
 
     ax.set_xlabel("k  (neighbourhood size)")
-    ax.set_ylabel("NH@k  (Neighbourhood Overlap)")
+    ax.set_ylabel("NO@k  (Neighbourhood Overlap)")
     _prefix = "(b) " if dataset == "mnist" else ""
-    ax.set_title(f"{_prefix}Affinity variants — NH@k on {dataset.upper()}")
+    ax.set_title(f"{_prefix}Affinity variants — NO@k on {dataset.upper()}")
     ax.legend(frameon=False, ncol=2, loc="lower right")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -365,7 +365,7 @@ def plot_nh_curves(df, out_dir, k_max=None, dataset="mnist"):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Compare affinity variants via NH@k",
+        description="Compare affinity variants via NO@k",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     # Dataset
@@ -396,7 +396,7 @@ def parse_args():
                    help="Degrees of freedom (intrinsic dim M') for the tt-SNE "
                         "Student-t HD kernel. 'auto' estimates it from the data.")
     p.add_argument("--k_max",            type=int,   default=200,
-                   help="Compute NH@k for k = 1 … k_max")
+                   help="Compute NO@k for k = 1 … k_max")
     p.add_argument("--n_runs",           type=int,   default=1,
                    help="Number of random seeds")
     p.add_argument("--random_state",     type=int,   default=42)
@@ -428,7 +428,7 @@ def main():
     # ── Load data ─────────────────────────────────────────────────────────────
     X_pca, y = load_dataset(args)
     print(f"  X_pca: {X_pca.shape}")
-    X_eval = X_pca   # evaluate NH@k in PCA space (the actual t-SNE input)
+    X_eval = X_pca   # evaluate NO@k in PCA space (the actual t-SNE input)
 
     # ── Seeds ─────────────────────────────────────────────────────────────────
     rng    = np.random.default_rng(args.random_state)
@@ -495,7 +495,7 @@ def main():
                     ee=args.ee,
                 )
 
-                print("NH@k ...", end=" ", flush=True)
+                print("NO@k ...", end=" ", flush=True)
                 ld_nbrs = knn_indices(np.asarray(Y), k=args.k_max, n_jobs=args.n_jobs)
                 curve   = nh_curve(hd_nbrs, ld_nbrs, args.k_max)
 
@@ -520,7 +520,7 @@ def main():
     # ── Summary + figure ──────────────────────────────────────────────────────
     df = pd.read_csv(csv_path)
 
-    print("\n=== Mean NH@k per method at selected k values ===")
+    print("\n=== Mean NO@k per method at selected k values ===")
     summary = (df[df["k"].isin([10, 30, 50, 100, 200])]
                  .groupby(["method", "k"])["nh_score"]
                  .mean()
